@@ -1,6 +1,18 @@
-import { useEffect, useState } from 'react'
+import {
+  closestCorners,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { useEffect, useRef, useState } from 'react'
 import DayCard from '../components/DayCard'
 import DayForm from '../components/DayForm'
+import { ItemCardOverlay } from '../components/ItemCard'
 import ItemForm from '../components/ItemForm'
 import TripForm from '../components/TripForm'
 import {
@@ -61,6 +73,13 @@ export default function TripView({ id, navigate }) {
   const [itemModal, setItemModal] = useState(null) // { dayId, item? }
   const [dayModal, setDayModal] = useState(null) // { day, index }
   const [editTrip, setEditTrip] = useState(false)
+  const [activeItem, setActiveItem] = useState(null) // item being dragged (for the overlay)
+  const dragSnapshot = useRef(null) // days before the drag, restored on cancel
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   useEffect(() => {
     if (!trip) navigate('')
@@ -119,6 +138,49 @@ export default function TripView({ id, navigate }) {
   const { arrival, departure } = flightEndpoints(trip)
   const today = todayISO()
 
+  const dayOfItem = itemId => trip.days.find(d => d.items.some(i => i.id === itemId))
+  const dayById = dayId => trip.days.find(d => d.id === dayId)
+
+  function handleDragStart({ active }) {
+    dragSnapshot.current = trip.days
+    setActiveItem(dayOfItem(active.id)?.items.find(i => i.id === active.id) ?? null)
+  }
+
+  // Move the item between days while dragging so the list previews the drop.
+  function handleDragOver({ active, over }) {
+    if (!over || active.id === over.id) return
+    const fromDay = dayOfItem(active.id)
+    const toDay = dayOfItem(over.id) ?? dayById(over.id)
+    if (!fromDay || !toDay || fromDay.id === toDay.id) return
+    const overIndex = toDay.items.findIndex(i => i.id === over.id)
+    const activeTop = active.rect.current.translated?.top ?? 0
+    const isBelow = overIndex >= 0 && activeTop > over.rect.top + over.rect.height / 2
+    const toIndex = overIndex >= 0 ? overIndex + (isBelow ? 1 : 0) : toDay.items.length
+    dispatch({ type: 'item/transfer', tripId: trip.id, fromDayId: fromDay.id, toDayId: toDay.id, itemId: active.id, toIndex })
+  }
+
+  function handleDragEnd({ active, over }) {
+    setActiveItem(null)
+    dragSnapshot.current = null
+    if (!over) return
+    const day = dayOfItem(active.id)
+    const toDay = dayOfItem(over.id) ?? dayById(over.id)
+    if (!day || !toDay || day.id !== toDay.id) return
+    const from = day.items.findIndex(i => i.id === active.id)
+    const to = day.items.findIndex(i => i.id === over.id)
+    if (from !== -1 && to !== -1 && from !== to) {
+      dispatch({ type: 'item/move', tripId: trip.id, dayId: day.id, from, to })
+    }
+  }
+
+  function handleDragCancel() {
+    if (dragSnapshot.current) {
+      dispatch({ type: 'trip/setDays', tripId: trip.id, days: dragSnapshot.current })
+      dragSnapshot.current = null
+    }
+    setActiveItem(null)
+  }
+
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-slate-50/80 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/80">
@@ -166,20 +228,31 @@ export default function TripView({ id, navigate }) {
           )}
         </div>
 
-        {trip.days.map((day, i) => (
-          <DayCard
-            key={day.id}
-            trip={trip}
-            day={day}
-            index={i}
-            stays={staysByDay[day.id]}
-            isPast={Boolean(day.date) && day.date < today}
-            isToday={day.date === today}
-            onEditDay={() => setDayModal({ day, index: i })}
-            onAddItem={() => setItemModal({ dayId: day.id })}
-            onEditItem={item => setItemModal({ dayId: day.id, item })}
-          />
-        ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          modifiers={[restrictToVerticalAxis]}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          {trip.days.map((day, i) => (
+            <DayCard
+              key={day.id}
+              trip={trip}
+              day={day}
+              index={i}
+              stays={staysByDay[day.id]}
+              isPast={Boolean(day.date) && day.date < today}
+              isToday={day.date === today}
+              onEditDay={() => setDayModal({ day, index: i })}
+              onAddItem={() => setItemModal({ dayId: day.id })}
+              onEditItem={item => setItemModal({ dayId: day.id, item })}
+            />
+          ))}
+          <DragOverlay>{activeItem ? <ItemCardOverlay item={activeItem} /> : null}</DragOverlay>
+        </DndContext>
 
         <button
           onClick={addDay}

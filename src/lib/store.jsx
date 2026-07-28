@@ -99,6 +99,25 @@ function reducer(state, a) {
           return { ...d, items }
         }),
       )
+    case 'item/transfer':
+      return mapTrip(state, a.tripId, t => {
+        const item = t.days.find(d => d.id === a.fromDayId)?.items.find(i => i.id === a.itemId)
+        if (!item || a.fromDayId === a.toDayId) return t
+        return {
+          ...t,
+          days: t.days.map(d => {
+            if (d.id === a.fromDayId) return { ...d, items: d.items.filter(i => i.id !== a.itemId) }
+            if (d.id === a.toDayId) {
+              const items = [...d.items]
+              items.splice(Math.min(a.toIndex, items.length), 0, item)
+              return { ...d, items }
+            }
+            return d
+          }),
+        }
+      })
+    case 'trip/setDays':
+      return mapTrip(state, a.tripId, t => ({ ...t, days: a.days }))
     case 'data/import': {
       // Trips with a known id replace the existing one (round-trip friendly);
       // everything else is added on top.

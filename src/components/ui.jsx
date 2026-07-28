@@ -142,7 +142,7 @@ export const IconApple = p => (
 /* ---------- shared class strings ---------- */
 
 export const btnPrimary =
-  'inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500 active:scale-[.98]'
+  'inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 active:scale-[.98] dark:bg-brand-600 dark:hover:bg-brand-500'
 export const btnGhost =
   'inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800'
 export const btnDanger =

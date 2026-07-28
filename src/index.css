@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+@theme {
+  /* Brand teal from the app icon (#0B3B39) with lighter hover steps */
+  --color-brand: #0b3b39;
+  --color-brand-600: #135e59;
+  --color-brand-500: #1a7a72;
+}
+
 html {
   color-scheme: light dark;
   -webkit-tap-highlight-color: transparent;

@@ -1,13 +1,5 @@
-import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
-import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { useDroppable } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { fmtDate } from '../lib/dates'
 import { useStore } from '../lib/store'
 import ItemCard from './ItemCard'
@@ -15,18 +7,8 @@ import { IconBed, IconPencil, IconPlus, IconTrash, iconBtn } from './ui'
 
 export default function DayCard({ trip, day, index, stays = [], isPast, isToday, onEditDay, onAddItem, onEditItem }) {
   const { dispatch } = useStore()
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-
-  function handleDragEnd({ active, over }) {
-    if (!over || active.id === over.id) return
-    const from = day.items.findIndex(i => i.id === active.id)
-    const to = day.items.findIndex(i => i.id === over.id)
-    if (from < 0 || to < 0) return
-    dispatch({ type: 'item/move', tripId: trip.id, dayId: day.id, from, to })
-  }
+  // Makes the whole day a drop target so items can be dragged into empty days.
+  const { setNodeRef, isOver } = useDroppable({ id: day.id })
 
   function setItemStatus(itemId, status) {
     dispatch({ type: 'item/update', tripId: trip.id, dayId: day.id, itemId, patch: { status } })
@@ -76,14 +58,14 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
         </div>
       ))}
 
-      {day.items.length > 0 && (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          modifiers={[restrictToVerticalAxis]}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={day.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+      <div
+        ref={setNodeRef}
+        className={`-m-1 rounded-2xl p-1 transition-colors ${
+          isOver && day.items.length === 0 ? 'bg-sky-100/70 dark:bg-sky-500/10' : ''
+        }`}
+      >
+        <SortableContext items={day.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+          {day.items.length > 0 && (
             <ul className="space-y-2">
               {day.items.map(item => (
                 <ItemCard
@@ -94,17 +76,17 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
                 />
               ))}
             </ul>
-          </SortableContext>
-        </DndContext>
-      )}
+          )}
+        </SortableContext>
 
-      <button
-        onClick={onAddItem}
-        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-sky-400 hover:text-sky-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-sky-500 dark:hover:text-sky-400"
-      >
-        <IconPlus className="size-4" />
-        {day.items.length === 0 ? 'Plan this day — flight, hotel, places…' : 'Add more'}
-      </button>
+        <button
+          onClick={onAddItem}
+          className={`${day.items.length > 0 ? 'mt-2 ' : ''}flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-sky-400 hover:text-sky-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-sky-500 dark:hover:text-sky-400`}
+        >
+          <IconPlus className="size-4" />
+          {day.items.length === 0 ? 'Plan this day — flight, hotel, places…' : 'Add more'}
+        </button>
+      </div>
     </section>
   )
 }
