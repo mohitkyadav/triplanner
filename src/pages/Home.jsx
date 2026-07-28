@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 import TripForm from '../components/TripForm'
 import {
   IconDownload,
@@ -94,7 +95,7 @@ export default function Home({ navigate }) {
                   <li
                     key={trip.id}
                     onClick={() => navigate(`/trip/${trip.id}`)}
-                    className="group cursor-pointer rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 transition hover:shadow-md hover:ring-sky-300 dark:bg-slate-900 dark:ring-slate-800 dark:hover:ring-sky-700"
+                    className="group cursor-pointer rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 transition hover:shadow-md hover:ring-brand-300 dark:bg-slate-900 dark:ring-slate-800 dark:hover:ring-brand-600"
                   >
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
@@ -145,6 +146,10 @@ export default function Home({ navigate }) {
             </div>
           </>
         )}
+
+        <div className="mt-10">
+          <ThemeSwitcher />
+        </div>
       </main>
 
       <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={importFile} />

@@ -76,7 +76,7 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
               onClick={() => setType(c.id)}
               className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-center transition ${
                 type === c.id
-                  ? 'bg-sky-50 ring-2 ring-sky-500 dark:bg-sky-500/10'
+                  ? 'bg-brand-50 ring-2 ring-brand-500 dark:bg-brand-500/10'
                   : 'ring-1 ring-slate-200 hover:bg-slate-50 dark:ring-slate-700 dark:hover:bg-slate-800'
               }`}
             >

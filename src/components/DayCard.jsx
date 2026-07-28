@@ -32,7 +32,7 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
           <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{fmtDate(day.date)}</span>
         )}
         {isToday && (
-          <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[11px] font-bold tracking-wide text-white">
+          <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold tracking-wide text-brand">
             Today
           </span>
         )}
@@ -61,7 +61,7 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
       <div
         ref={setNodeRef}
         className={`-m-1 rounded-2xl p-1 transition-colors ${
-          isOver && day.items.length === 0 ? 'bg-sky-100/70 dark:bg-sky-500/10' : ''
+          isOver && day.items.length === 0 ? 'bg-brand-100/70 dark:bg-brand-500/10' : ''
         }`}
       >
         <SortableContext items={day.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
@@ -81,7 +81,7 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
 
         <button
           onClick={onAddItem}
-          className={`${day.items.length > 0 ? 'mt-2 ' : ''}flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-sky-400 hover:text-sky-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-sky-500 dark:hover:text-sky-400`}
+          className={`${day.items.length > 0 ? 'mt-2 ' : ''}flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-300`}
         >
           <IconPlus className="size-4" />
           {day.items.length === 0 ? 'Plan this day — flight, hotel, places…' : 'Add more'}

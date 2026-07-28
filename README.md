@@ -23,6 +23,9 @@ and imported as JSON.
   skipped (skipped plans show struck-through and dimmed).
 - **Lives in the present** — opening a trip that spans today smoothly scrolls
   to the current day; past days are dimmed until you hover them.
+- **Light / Dark / System theme** — switcher on the home screen; the choice is
+  persisted, applied before first paint (no flash), and "System" tracks the OS
+  live.
 - **Export / import** — back up everything or a single trip as a JSON file.
   Importing a file with a known trip id updates that trip; new ids are added.
 - **PWA** — installable, works fully offline after the first visit.

@@ -57,7 +57,7 @@ function Card({ item, onEdit, onSetStatus, ghost, overlay, dragRef, dragStyle, h
         ghost
           ? 'opacity-40 shadow-sm ring-slate-200 dark:ring-slate-800'
           : overlay
-            ? 'shadow-2xl ring-sky-400 dark:ring-sky-500'
+            ? 'shadow-2xl ring-brand-400 dark:ring-brand-500'
             : 'shadow-sm ring-slate-200 dark:ring-slate-800'
       }`}
     >
@@ -117,7 +117,7 @@ function Card({ item, onEdit, onSetStatus, ghost, overlay, dragRef, dragStyle, h
                 href={item.mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-600 hover:underline dark:text-sky-400"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:underline dark:text-brand-300"
               >
                 <maps.icon className="size-3.5" />
                 {maps.label}

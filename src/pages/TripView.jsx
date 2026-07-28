@@ -51,7 +51,7 @@ function FlightRow({ icon: Icon, label, item, day }) {
   const sub = [fmtDate(day.date), item.time, item.location].filter(Boolean).join(' · ')
   return (
     <div className="flex items-center gap-3 px-5 py-3">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
         <Icon className="size-4.5" />
       </span>
       <div className="min-w-0">
@@ -207,7 +207,7 @@ export default function TripView({ id, navigate }) {
             <h2 className="text-2xl font-bold tracking-tight">{trip.name}</h2>
             {trip.destination && (
               <p className="mt-1.5 flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
-                <IconMapPin className="size-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                <IconMapPin className="size-4 shrink-0 text-brand-600 dark:text-brand-300" />
                 {trip.destination}
               </p>
             )}
@@ -256,7 +256,7 @@ export default function TripView({ id, navigate }) {
 
         <button
           onClick={addDay}
-          className="flex w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-slate-300 px-4 py-4 font-semibold text-slate-500 transition hover:border-sky-400 hover:text-sky-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-sky-500 dark:hover:text-sky-400"
+          className="flex w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-slate-300 px-4 py-4 font-semibold text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-300"
         >
           <IconPlus className="size-5" />
           Add day {trip.days.length + 1}

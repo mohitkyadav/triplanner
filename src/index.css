@@ -1,14 +1,24 @@
 @import "tailwindcss";
 
+/* Manual theme switching: `dark:` follows the data-theme attribute set by
+   src/lib/theme.js (and the pre-paint script in index.html), not the OS. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
-  /* Brand teal from the app icon (#0B3B39) with lighter hover steps */
-  --color-brand: #0b3b39;
-  --color-brand-600: #135e59;
+  /* Brand teal ramp derived from the app icon (#0b3b39) + its amber accent dot */
+  --color-brand-50: #eef7f5;
+  --color-brand-100: #d7ece8;
+  --color-brand-200: #b2d9d2;
+  --color-brand-300: #7fbfb5;
+  --color-brand-400: #48a094;
   --color-brand-500: #1a7a72;
+  --color-brand-600: #135e59;
+  --color-brand-700: #0f4c48;
+  --color-brand: #0b3b39;
+  --color-accent: #e5a33f;
 }
 
 html {
-  color-scheme: light dark;
   -webkit-tap-highlight-color: transparent;
 }
 
