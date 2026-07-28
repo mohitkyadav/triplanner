@@ -40,7 +40,7 @@ function normalizeItem(i) {
       location: str(i.location),
     }),
     ...(i.type === 'hotel' && {
-      hotelAction: ['check-in', 'check-out', 'stay'].includes(i.hotelAction) ? i.hotelAction : 'check-in',
+      hotelAction: i.hotelAction === 'check-out' ? 'check-out' : 'check-in',
     }),
   }
 }

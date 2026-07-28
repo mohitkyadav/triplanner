@@ -1,4 +1,4 @@
-// Generates the PWA PNG icons (gradient rounded square + map pin) with zero
+// Generates the PWA PNG icons (flat rounded square + map pin) with zero
 // dependencies — pure Node zlib PNG encoding, 3x3 supersampled for smooth edges.
 import { deflateSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
@@ -43,8 +43,8 @@ function png(size, pixels) {
   ])
 }
 
-const C1 = [56, 189, 248] // sky-400
-const C2 = [99, 102, 241] // indigo-500
+const C1 = [2, 132, 199] // sky-600 — flat brand color, no gradient
+const C2 = C1
 
 // One sample in unit space -> [r, g, b, a]
 function sample(u, v, { cornerRadius, glyphScale }) {

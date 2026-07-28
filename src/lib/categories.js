@@ -11,6 +11,7 @@ export const CATEGORIES = [
   { id: 'beach', label: 'Beach', emoji: '🏖️', badge: 'bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300' },
   { id: 'shopping', label: 'Shopping', emoji: '🛍️', badge: 'bg-pink-100 text-pink-700 dark:bg-pink-400/10 dark:text-pink-300' },
   { id: 'activity', label: 'Activity', emoji: '🎟️', badge: 'bg-lime-100 text-lime-800 dark:bg-lime-400/10 dark:text-lime-300' },
+  { id: 'work', label: 'Work', emoji: '💼', badge: 'bg-stone-200 text-stone-700 dark:bg-stone-400/10 dark:text-stone-300' },
   { id: 'other', label: 'Other', emoji: '📌', badge: 'bg-slate-100 text-slate-700 dark:bg-slate-400/10 dark:text-slate-300' },
 ]
 
@@ -25,5 +26,13 @@ export function titleFor(item) {
   return 'Untitled'
 }
 
-export const gmapsUrl = q => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
-export const amapsUrl = q => `https://maps.apple.com/?q=${encodeURIComponent(q)}`
+export function mapsProvider(url) {
+  try {
+    const h = new URL(url).hostname.toLowerCase()
+    if (h.endsWith('.apple.com')) return 'apple'
+    if (h === 'goo.gl' || h.endsWith('.goo.gl') || h.includes('google.')) return 'google'
+  } catch {
+    // not a parseable URL — fall through to generic
+  }
+  return 'other'
+}

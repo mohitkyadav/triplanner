@@ -8,11 +8,15 @@ and imported as JSON.
 
 - **Trips → days → plans** — create a trip (days are auto-generated from the
   date range), then fill each day with flights, hotel check-ins/outs and places.
-- **13 place types** — restaurant, museum, park, landmark, café, nightlife,
-  beach, shopping, activity and more, each with notes ("what to eat here…"),
-  an optional time, and a maps link.
-- **Maps integration** — paste a Google/Apple Maps link, or let the app
-  generate search links from the place name + destination.
+- **14 place types** — restaurant, museum, park, landmark, café, nightlife,
+  beach, shopping, activity, work and more, each with notes ("what to eat
+  here…"), an optional time, and a maps link.
+- **Maps links** — paste a Google or Apple Maps link and the card shows the
+  matching provider icon.
+- **Computed hotel stays** — add a check-in and a check-out; the days in
+  between automatically show a subdued "Staying at …" strip.
+- **Smart trip banner** — the trip card surfaces the arrival flight and the
+  final departure flight when you've added them.
 - **Drag to reorder** — smoothly re-arrange the order of places within a day
   (touch friendly, via dnd-kit).
 - **Export / import** — back up everything or a single trip as a JSON file.

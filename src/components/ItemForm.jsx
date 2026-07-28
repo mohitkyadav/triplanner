@@ -1,12 +1,25 @@
 import { useState } from 'react'
 import { CATEGORIES } from '../lib/categories'
-import { btnDanger, btnGhost, btnPrimary, Field, inputCls, Modal, Segmented } from './ui'
+import {
+  btnDanger,
+  btnGhost,
+  btnPrimary,
+  Field,
+  IconLogIn,
+  IconLogOut,
+  IconPlaneLanding,
+  IconPlaneTakeoff,
+  inputCls,
+  Modal,
+  Segmented,
+} from './ui'
 
 const NOTE_HINTS = {
   restaurant: 'What to eat, must-try dishes, reservation info…',
   flight: 'Terminal, seat, booking reference…',
   hotel: 'Booking reference, address, breakfast times…',
   museum: 'Exhibitions to see, ticket info…',
+  work: 'Meetings, calls, focus blocks…',
 }
 
 export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose }) {
@@ -20,7 +33,7 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
     flightNo: initial?.flightNo ?? '',
     direction: initial?.direction ?? 'arrival',
     location: initial?.location ?? '',
-    hotelAction: initial?.hotelAction ?? 'check-in',
+    hotelAction: initial?.hotelAction === 'check-out' ? 'check-out' : 'check-in',
   })
   const set = k => e => setF(prev => ({ ...prev, [k]: e.target.value }))
 
@@ -74,8 +87,8 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
               value={f.direction}
               onChange={v => setF(prev => ({ ...prev, direction: v }))}
               options={[
-                { value: 'arrival', label: 'Arrival' },
-                { value: 'departure', label: 'Departure' },
+                { value: 'arrival', label: 'Arrival', icon: IconPlaneLanding },
+                { value: 'departure', label: 'Departure', icon: IconPlaneTakeoff },
               ]}
             />
             <div className="grid grid-cols-2 gap-3">
@@ -97,9 +110,8 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
             value={f.hotelAction}
             onChange={v => setF(prev => ({ ...prev, hotelAction: v }))}
             options={[
-              { value: 'check-in', label: 'Check-in' },
-              { value: 'check-out', label: 'Check-out' },
-              { value: 'stay', label: 'Stay' },
+              { value: 'check-in', label: 'Check-in', icon: IconLogIn },
+              { value: 'check-out', label: 'Check-out', icon: IconLogOut },
             ]}
           />
         )}

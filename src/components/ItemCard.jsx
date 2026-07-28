@@ -1,25 +1,42 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { amapsUrl, catById, gmapsUrl, titleFor } from '../lib/categories'
-import { IconGrip, IconMapPin } from './ui'
+import { catById, mapsProvider, titleFor } from '../lib/categories'
+import {
+  IconApple,
+  IconGoogle,
+  IconGrip,
+  IconLogIn,
+  IconLogOut,
+  IconMapPin,
+  IconPlaneLanding,
+  IconPlaneTakeoff,
+} from './ui'
 
-const HOTEL_LABELS = { 'check-in': 'Check-in', 'check-out': 'Check-out', stay: 'Stay' }
+const MAPS_META = {
+  google: { icon: IconGoogle, label: 'Google Maps' },
+  apple: { icon: IconApple, label: 'Apple Maps' },
+  other: { icon: IconMapPin, label: 'Open map' },
+}
 
-export default function ItemCard({ item, destination, onEdit }) {
+export default function ItemCard({ item, onEdit }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id })
 
   const cat = catById(item.type)
   const title = titleFor(item)
-  const mapsQuery = [item.title, destination].filter(Boolean).join(', ')
 
-  const meta = []
+  let MetaIcon = null
+  let metaText = ''
   if (item.type === 'flight') {
-    meta.push(item.direction === 'departure' ? 'Departure' : 'Arrival')
-    if (item.location) meta.push(item.location)
-  } else if (item.type === 'hotel' && item.hotelAction) {
-    meta.push(HOTEL_LABELS[item.hotelAction] ?? item.hotelAction)
+    MetaIcon = item.direction === 'departure' ? IconPlaneTakeoff : IconPlaneLanding
+    metaText = item.direction === 'departure' ? 'Departure' : 'Arrival'
+    if (item.location) metaText += ` · ${item.location}`
+  } else if (item.type === 'hotel') {
+    MetaIcon = item.hotelAction === 'check-out' ? IconLogOut : IconLogIn
+    metaText = item.hotelAction === 'check-out' ? 'Check-out' : 'Check-in'
   }
+
+  const maps = item.mapsUrl ? MAPS_META[mapsProvider(item.mapsUrl)] : null
 
   return (
     <li
@@ -56,41 +73,33 @@ export default function ItemCard({ item, destination, onEdit }) {
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
             <span className={`rounded-md px-1.5 py-0.5 font-medium ${cat.badge}`}>{cat.label}</span>
-            {meta.length > 0 && <span>{meta.join(' · ')}</span>}
+            {metaText && (
+              <span className="inline-flex items-center gap-1">
+                <MetaIcon className="size-3.5" />
+                {metaText}
+              </span>
+            )}
           </div>
           {item.notes && (
             <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-sm text-slate-500 dark:text-slate-400">
               {item.notes}
             </p>
           )}
-          {(item.mapsUrl || mapsQuery) && (
-            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1" onClick={e => e.stopPropagation()}>
-              {item.mapsUrl ? (
-                <MapLink href={item.mapsUrl}>Open map</MapLink>
-              ) : (
-                <>
-                  <MapLink href={gmapsUrl(mapsQuery)}>Google Maps</MapLink>
-                  <MapLink href={amapsUrl(mapsQuery)}>Apple Maps</MapLink>
-                </>
-              )}
+          {maps && (
+            <div className="mt-1.5" onClick={e => e.stopPropagation()}>
+              <a
+                href={item.mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-600 hover:underline dark:text-sky-400"
+              >
+                <maps.icon className="size-3.5" />
+                {maps.label}
+              </a>
             </div>
           )}
         </div>
       </div>
     </li>
-  )
-}
-
-function MapLink({ href, children }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 hover:underline dark:text-sky-400"
-    >
-      <IconMapPin className="size-3.5" />
-      {children}
-    </a>
   )
 }

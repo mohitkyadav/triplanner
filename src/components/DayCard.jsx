@@ -11,9 +11,9 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import { fmtDate } from '../lib/dates'
 import { useStore } from '../lib/store'
 import ItemCard from './ItemCard'
-import { IconPencil, IconPlus, IconTrash, iconBtn } from './ui'
+import { IconBed, IconPencil, IconPlus, IconTrash, iconBtn } from './ui'
 
-export default function DayCard({ trip, day, index, onEditDay, onAddItem, onEditItem }) {
+export default function DayCard({ trip, day, index, stays = [], onEditDay, onAddItem, onEditItem }) {
   const { dispatch } = useStore()
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -54,6 +54,16 @@ export default function DayCard({ trip, day, index, onEditDay, onAddItem, onEdit
         </button>
       </div>
 
+      {stays.map(name => (
+        <div
+          key={name}
+          className="mb-2 flex items-center gap-2.5 rounded-xl border border-dashed border-violet-300/70 bg-violet-50/60 px-3.5 py-2.5 text-sm font-medium text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/5 dark:text-violet-300"
+        >
+          <IconBed className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">Staying at {name}</span>
+        </div>
+      ))}
+
       {day.items.length > 0 && (
         <DndContext
           sensors={sensors}
@@ -64,7 +74,7 @@ export default function DayCard({ trip, day, index, onEditDay, onAddItem, onEdit
           <SortableContext items={day.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
             <ul className="space-y-2">
               {day.items.map(item => (
-                <ItemCard key={item.id} item={item} destination={trip.destination} onEdit={() => onEditItem(item)} />
+                <ItemCard key={item.id} item={item} onEdit={() => onEditItem(item)} />
               ))}
             </ul>
           </SortableContext>

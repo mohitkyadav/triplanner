@@ -70,11 +70,62 @@ export const IconGrip = p => (
     <circle cx="15" cy="18" r="1.4" />
   </Svg>
 )
+export const IconCalendar = p => (
+  <Svg {...p}>
+    <path d="M8 2v4M16 2v4" />
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <path d="M3 10h18" />
+  </Svg>
+)
+export const IconBed = p => (
+  <Svg {...p}>
+    <path d="M2 4v16" />
+    <path d="M2 8h18a2 2 0 0 1 2 2v10" />
+    <path d="M2 17h20" />
+    <path d="M6 8v9" />
+  </Svg>
+)
+export const IconPlaneLanding = p => (
+  <Svg {...p}>
+    <path d="M2 22h20" />
+    <path d="M3.77 10.77 2 9l2-4.5 1.1.55c.55.28.9.84.9 1.45s.35 1.17.9 1.45L8 8.5l3-6 .9.45a2 2 0 0 1 1.05 1.79v3.45a2 2 0 0 0 1.05 1.79l4.17 2.08a2.41 2.41 0 0 1 1.33 2.15c0 .79-.78 1.35-1.53 1.1L4.55 12.2a2 2 0 0 1-.78-.43Z" />
+  </Svg>
+)
+export const IconPlaneTakeoff = p => (
+  <Svg {...p}>
+    <path d="M2 22h20" />
+    <path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z" />
+  </Svg>
+)
+export const IconLogIn = p => (
+  <Svg {...p}>
+    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+    <path d="M10 17l5-5-5-5" />
+    <path d="M15 12H3" />
+  </Svg>
+)
+export const IconLogOut = p => (
+  <Svg {...p}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <path d="M16 17l5-5-5-5" />
+    <path d="M21 12H9" />
+  </Svg>
+)
+export const IconGoogle = p => (
+  <Svg {...p} stroke="none" fill="currentColor">
+    <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
+  </Svg>
+)
+export const IconApple = p => (
+  <Svg {...p} stroke="none" fill="currentColor">
+    <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.03 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.56-1.702" />
+  </Svg>
+)
 
 /* ---------- shared class strings ---------- */
 
 export const btnPrimary =
-  'inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:from-sky-400 hover:to-indigo-400 active:scale-[.98]'
+  'inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500 active:scale-[.98]'
 export const btnGhost =
   'inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800'
 export const btnDanger =
@@ -103,12 +154,13 @@ export function Segmented({ options, value, onChange }) {
           type="button"
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+          className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
             value === o.value
               ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-600 dark:text-white'
               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
+          {o.icon && <o.icon className="size-4" />}
           {o.label}
         </button>
       ))}

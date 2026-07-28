@@ -5,16 +5,53 @@ import ItemForm from '../components/ItemForm'
 import TripForm from '../components/TripForm'
 import {
   IconArrowLeft,
+  IconCalendar,
   IconDownload,
+  IconMapPin,
   IconPencil,
+  IconPlaneLanding,
+  IconPlaneTakeoff,
   IconPlus,
   IconTrash,
   iconBtn,
   useToast,
 } from '../components/ui'
-import { addDaysISO, fmtRange, todayISO } from '../lib/dates'
+import { addDaysISO, fmtDate, fmtRange, todayISO } from '../lib/dates'
 import { downloadJSON, exportPayload, slug } from '../lib/io'
 import { makeDay, uid, useStore } from '../lib/store'
+import { computeStays } from '../lib/stays'
+
+// First arrival flight and last departure flight of the trip, for the banner.
+function flightEndpoints(trip) {
+  let arrival = null
+  let departure = null
+  for (const day of trip.days) {
+    for (const item of day.items) {
+      if (item.type !== 'flight') continue
+      if (item.direction === 'departure') departure = { item, day }
+      else if (!arrival) arrival = { item, day }
+    }
+  }
+  return { arrival, departure }
+}
+
+function FlightRow({ icon: Icon, label, item, day }) {
+  const sub = [fmtDate(day.date), item.time, item.location].filter(Boolean).join(' · ')
+  return (
+    <div className="flex items-center gap-3 px-5 py-3">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
+        <Icon className="size-4.5" />
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">
+          {label}
+          {item.flightNo && <span className="font-medium text-slate-500 dark:text-slate-400"> · {item.flightNo}</span>}
+        </p>
+        {sub && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{sub}</p>}
+      </div>
+    </div>
+  )
+}
 
 export default function TripView({ id, navigate }) {
   const { state, dispatch } = useStore()
@@ -65,6 +102,8 @@ export default function TripView({ id, navigate }) {
   }
 
   const modalDayIndex = itemModal ? trip.days.findIndex(d => d.id === itemModal.dayId) : -1
+  const staysByDay = computeStays(trip)
+  const { arrival, departure } = flightEndpoints(trip)
 
   return (
     <div className="min-h-dvh">
@@ -75,26 +114,42 @@ export default function TripView({ id, navigate }) {
           </button>
           <h1 className="min-w-0 flex-1 truncate px-1 font-semibold">{trip.name}</h1>
           <button className={iconBtn} onClick={() => setEditTrip(true)} aria-label="Edit trip">
-            <IconPencil className="size-[18px]" />
+            <IconPencil className="size-4.5" />
           </button>
           <button className={iconBtn} onClick={exportTrip} aria-label="Export trip">
-            <IconDownload className="size-[18px]" />
+            <IconDownload className="size-4.5" />
           </button>
           <button className={iconBtn} onClick={deleteTrip} aria-label="Delete trip">
-            <IconTrash className="size-[18px]" />
+            <IconTrash className="size-4.5" />
           </button>
         </div>
       </header>
 
       <main className="mx-auto max-w-2xl space-y-8 px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-5">
-        <div className="rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-500 p-5 text-white shadow-md">
-          <h2 className="text-2xl font-bold">{trip.name}</h2>
-          {trip.destination && <p className="mt-0.5 font-medium text-sky-100">{trip.destination}</p>}
-          <p className="mt-1.5 text-sm text-sky-100/90">
-            {[fmtRange(trip.startDate, trip.endDate), `${trip.days.length} day${trip.days.length === 1 ? '' : 's'}`, `${stops} stop${stops === 1 ? '' : 's'}`]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+          <div className="p-5">
+            <h2 className="text-2xl font-bold tracking-tight">{trip.name}</h2>
+            {trip.destination && (
+              <p className="mt-1.5 flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+                <IconMapPin className="size-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                {trip.destination}
+              </p>
+            )}
+            <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
+              <IconCalendar className="size-4 shrink-0" />
+              {[fmtRange(trip.startDate, trip.endDate), `${trip.days.length} day${trip.days.length === 1 ? '' : 's'}`, `${stops} stop${stops === 1 ? '' : 's'}`]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          </div>
+          {(arrival || departure) && (
+            <div className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
+              {arrival && <FlightRow icon={IconPlaneLanding} label="Arrival" item={arrival.item} day={arrival.day} />}
+              {departure && (
+                <FlightRow icon={IconPlaneTakeoff} label="Departure" item={departure.item} day={departure.day} />
+              )}
+            </div>
+          )}
         </div>
 
         {trip.days.map((day, i) => (
@@ -103,6 +158,7 @@ export default function TripView({ id, navigate }) {
             trip={trip}
             day={day}
             index={i}
+            stays={staysByDay[day.id]}
             onEditDay={() => setDayModal({ day, index: i })}
             onAddItem={() => setItemModal({ dayId: day.id })}
             onEditItem={item => setItemModal({ dayId: day.id, item })}
