@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+html {
+  color-scheme: light dark;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  overscroll-behavior-y: none;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+}
+
+.anim-backdrop { animation: fade-in 0.18s ease-out; }
+.anim-sheet { animation: pop-in 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+.anim-toast { animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
