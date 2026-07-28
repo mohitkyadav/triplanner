@@ -20,6 +20,9 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
+  /* clip (not hidden) — kills any stray horizontal scroll without creating a
+     scroll container, so position: sticky keeps working */
+  overflow-x: clip;
 }
 
 body {

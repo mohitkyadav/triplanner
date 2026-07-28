@@ -166,8 +166,10 @@ export const btnDanger =
   'inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10'
 export const iconBtn =
   'rounded-lg p-2 text-slate-500 transition hover:bg-slate-200/60 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+// 16px minimum on editable fields — anything smaller triggers iOS Safari's
+// auto-zoom on focus, which leaves the page horizontally scrollable.
 export const inputCls =
-  'w-full rounded-xl border-0 bg-slate-100 px-3.5 py-2.5 text-[15px] text-slate-900 outline-none ring-1 ring-transparent transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-brand-400'
+  'w-full rounded-xl border-0 bg-slate-100 px-3.5 py-2.5 text-base text-slate-900 outline-none ring-1 ring-transparent transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-brand-400'
 
 /* ---------- small form primitives ---------- */
 
@@ -205,6 +207,12 @@ export function Segmented({ options, value, onChange }) {
 /* ---------- modal (bottom sheet on mobile, dialog on desktop) ---------- */
 
 export function Modal({ title, onClose, children }) {
+  // Height of the on-screen keyboard overlapping the layout viewport (iOS
+  // Safari keeps position:fixed anchored behind the keyboard). Where the
+  // browser resizes the layout instead (interactive-widget=resizes-content),
+  // this stays 0.
+  const [kbInset, setKbInset] = useState(0)
+
   useEffect(() => {
     const onKey = e => e.key === 'Escape' && onClose()
     document.addEventListener('keydown', onKey)
@@ -215,13 +223,30 @@ export function Modal({ title, onClose, children }) {
     }
   }, [onClose])
 
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => setKbInset(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)))
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+      style={kbInset ? { paddingBottom: kbInset } : undefined}
+    >
       <div className="anim-backdrop absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
         className="anim-sheet relative flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-white shadow-xl sm:max-w-lg sm:rounded-2xl dark:bg-slate-900"
+        style={kbInset ? { maxHeight: `calc(100dvh - ${kbInset}px - 1.5rem)` } : undefined}
       >
         <div className="flex items-center justify-between px-5 pb-1 pt-4">
           <h2 className="text-lg font-bold">{title}</h2>
