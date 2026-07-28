@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { btnGhost, btnPrimary, Field, inputCls, Modal } from './ui'
+import { btnGhost, btnPrimary, Field, inputCls, Modal, PickerInput } from './ui'
 
 export default function TripForm({ initial, onSave, onClose }) {
   const editing = Boolean(initial)
@@ -36,10 +36,10 @@ export default function TripForm({ initial, onSave, onClose }) {
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Start date">
-            <input type="date" className={inputCls} value={f.startDate} onChange={set('startDate')} />
+            <PickerInput value={f.startDate} onChange={set('startDate')} />
           </Field>
           <Field label="End date">
-            <input type="date" className={inputCls} value={f.endDate} onChange={set('endDate')} min={f.startDate || undefined} />
+            <PickerInput value={f.endDate} onChange={set('endDate')} min={f.startDate || undefined} />
           </Field>
         </div>
         {!editing && (

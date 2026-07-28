@@ -14,6 +14,7 @@ import {
   IconXCircle,
   inputCls,
   Modal,
+  PickerInput,
   Segmented,
 } from './ui'
 
@@ -101,7 +102,7 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
                 <input className={inputCls} value={f.flightNo} onChange={set('flightNo')} placeholder="LH 1178" />
               </Field>
               <Field label={f.direction === 'arrival' ? 'Arrival time' : 'Departure time'}>
-                <input type="time" className={inputCls} value={f.time} onChange={set('time')} />
+                <PickerInput type="time" value={f.time} onChange={set('time')} />
               </Field>
             </div>
             <Field label="Airport / location">
@@ -134,7 +135,7 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
 
         {type !== 'flight' && (
           <Field label="Time (optional)">
-            <input type="time" className={inputCls} value={f.time} onChange={set('time')} />
+            <PickerInput type="time" value={f.time} onChange={set('time')} />
           </Field>
         )}
 

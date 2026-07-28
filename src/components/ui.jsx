@@ -94,6 +94,12 @@ export const IconCalendar = p => (
     <path d="M3 10h18" />
   </Svg>
 )
+export const IconClock = p => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 6v6l4 2" />
+  </Svg>
+)
 export const IconBed = p => (
   <Svg {...p}>
     <path d="M2 4v16" />
@@ -179,6 +185,35 @@ export function Field({ label, children }) {
       <span className="mb-1.5 block text-[13px] font-medium text-slate-500 dark:text-slate-400">{label}</span>
       {children}
     </label>
+  )
+}
+
+/* Native date/time input, normalized. iOS Safari gives empty pickers no
+   placeholder and no icon (they render as a blank pill) and an intrinsic
+   width that overflows narrow grid cells — so we reset appearance, overlay
+   our own placeholder + icon, and leave the native picker interaction
+   untouched. On desktop browsers the built-in segments/indicator are hidden
+   while empty and unfocused so the overlay placeholder shows instead. */
+export function PickerInput({ type = 'date', value, onChange, placeholder, ...rest }) {
+  const Icon = type === 'time' ? IconClock : IconCalendar
+  return (
+    <div className="relative">
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        className={`${inputCls} peer min-h-11 min-w-0 appearance-none pr-10 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:size-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 ${
+          value ? '' : 'text-transparent focus:text-slate-900 dark:focus:text-slate-100'
+        }`}
+        {...rest}
+      />
+      {!value && (
+        <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-base text-slate-400 peer-focus:hidden">
+          {placeholder ?? (type === 'time' ? 'Select time' : 'Select date')}
+        </span>
+      )}
+      <Icon className="pointer-events-none absolute right-3.5 top-1/2 size-4.5 -translate-y-1/2 text-slate-400" />
+    </div>
   )
 }
 

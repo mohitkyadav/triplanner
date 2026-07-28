@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { btnGhost, btnPrimary, Field, inputCls, Modal } from './ui'
+import { btnGhost, btnPrimary, Field, inputCls, Modal, PickerInput } from './ui'
 
 export default function DayForm({ day, index, onSave, onClose }) {
   const [date, setDate] = useState(day.date ?? '')
@@ -14,7 +14,7 @@ export default function DayForm({ day, index, onSave, onClose }) {
     <Modal title={`Edit day ${index + 1}`} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Date">
-          <input type="date" className={inputCls} value={date} onChange={e => setDate(e.target.value)} />
+          <PickerInput value={date} onChange={e => setDate(e.target.value)} />
         </Field>
         <Field label="Label (optional)">
           <input
