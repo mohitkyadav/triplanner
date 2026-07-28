@@ -13,7 +13,7 @@ import { useStore } from '../lib/store'
 import ItemCard from './ItemCard'
 import { IconBed, IconPencil, IconPlus, IconTrash, iconBtn } from './ui'
 
-export default function DayCard({ trip, day, index, stays = [], onEditDay, onAddItem, onEditItem }) {
+export default function DayCard({ trip, day, index, stays = [], isPast, isToday, onEditDay, onAddItem, onEditItem }) {
   const { dispatch } = useStore()
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -28,6 +28,10 @@ export default function DayCard({ trip, day, index, stays = [], onEditDay, onAdd
     dispatch({ type: 'item/move', tripId: trip.id, dayId: day.id, from, to })
   }
 
+  function setItemStatus(itemId, status) {
+    dispatch({ type: 'item/update', tripId: trip.id, dayId: day.id, itemId, patch: { status } })
+  }
+
   function deleteDay() {
     const label = `Day ${index + 1}`
     if (day.items.length === 0 || window.confirm(`Delete ${label} and its ${day.items.length} plans?`)) {
@@ -36,11 +40,19 @@ export default function DayCard({ trip, day, index, stays = [], onEditDay, onAdd
   }
 
   return (
-    <section>
+    <section
+      id={`day-${day.id}`}
+      className={`scroll-mt-18 transition-opacity duration-300 ${isPast ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''}`}
+    >
       <div className="mb-2.5 flex items-center gap-2 px-1">
         <h2 className="text-lg font-bold">Day {index + 1}</h2>
         {day.date && (
           <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{fmtDate(day.date)}</span>
+        )}
+        {isToday && (
+          <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[11px] font-bold tracking-wide text-white">
+            Today
+          </span>
         )}
         {day.title && (
           <span className="min-w-0 truncate text-sm text-slate-400 dark:text-slate-500">· {day.title}</span>
@@ -74,7 +86,12 @@ export default function DayCard({ trip, day, index, stays = [], onEditDay, onAdd
           <SortableContext items={day.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
             <ul className="space-y-2">
               {day.items.map(item => (
-                <ItemCard key={item.id} item={item} onEdit={() => onEditItem(item)} />
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  onEdit={() => onEditItem(item)}
+                  onSetStatus={status => setItemStatus(item.id, status)}
+                />
               ))}
             </ul>
           </SortableContext>

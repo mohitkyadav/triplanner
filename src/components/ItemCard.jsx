@@ -3,6 +3,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { catById, mapsProvider, titleFor } from '../lib/categories'
 import {
   IconApple,
+  IconCheckCircle,
+  IconCircle,
   IconGoogle,
   IconGrip,
   IconLogIn,
@@ -10,7 +12,19 @@ import {
   IconMapPin,
   IconPlaneLanding,
   IconPlaneTakeoff,
+  IconXCircle,
 } from './ui'
+
+const STATUS_CYCLE = { undefined: 'done', done: 'skipped', skipped: undefined }
+const STATUS_UI = {
+  done: { icon: IconCheckCircle, cls: 'text-emerald-500 hover:text-emerald-600', label: 'Done — tap to mark skipped' },
+  skipped: { icon: IconXCircle, cls: 'text-slate-400 hover:text-slate-500', label: 'Skipped — tap to mark planned' },
+  planned: {
+    icon: IconCircle,
+    cls: 'text-slate-300 hover:text-slate-400 dark:text-slate-600 dark:hover:text-slate-500',
+    label: 'Planned — tap to mark done',
+  },
+}
 
 const MAPS_META = {
   google: { icon: IconGoogle, label: 'Google Maps' },
@@ -18,7 +32,7 @@ const MAPS_META = {
   other: { icon: IconMapPin, label: 'Open map' },
 }
 
-export default function ItemCard({ item, onEdit }) {
+export default function ItemCard({ item, onEdit, onSetStatus }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id })
 
@@ -37,6 +51,8 @@ export default function ItemCard({ item, onEdit }) {
   }
 
   const maps = item.mapsUrl ? MAPS_META[mapsProvider(item.mapsUrl)] : null
+  const status = STATUS_UI[item.status] ?? STATUS_UI.planned
+  const skipped = item.status === 'skipped'
 
   return (
     <li
@@ -58,13 +74,16 @@ export default function ItemCard({ item, onEdit }) {
         <IconGrip className="size-4" />
       </button>
 
-      <div className="flex min-w-0 flex-1 cursor-pointer items-start gap-3" onClick={onEdit}>
+      <div
+        className={`flex min-w-0 flex-1 cursor-pointer items-start gap-3 ${skipped ? 'opacity-50' : ''}`}
+        onClick={onEdit}
+      >
         <span className={`grid size-10 shrink-0 place-items-center rounded-xl text-lg ${cat.badge}`}>
           {cat.emoji}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
-            <span className="min-w-0 flex-1 truncate font-medium">{title}</span>
+            <span className={`min-w-0 flex-1 truncate font-medium ${skipped ? 'line-through' : ''}`}>{title}</span>
             {item.time && (
               <span className="mt-0.5 shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 {item.time}
@@ -100,6 +119,15 @@ export default function ItemCard({ item, onEdit }) {
           )}
         </div>
       </div>
+
+      <button
+        onClick={() => onSetStatus(STATUS_CYCLE[item.status])}
+        className={`mt-1 shrink-0 rounded-full p-1 transition ${status.cls}`}
+        aria-label={status.label}
+        title={status.label}
+      >
+        <status.icon className="size-5.5" />
+      </button>
     </li>
   )
 }

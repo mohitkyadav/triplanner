@@ -70,6 +70,23 @@ export const IconGrip = p => (
     <circle cx="15" cy="18" r="1.4" />
   </Svg>
 )
+export const IconCircle = p => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="10" />
+  </Svg>
+)
+export const IconCheckCircle = p => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="m9 12 2 2 4-4" />
+  </Svg>
+)
+export const IconXCircle = p => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="m15 9-6 6M9 9l6 6" />
+  </Svg>
+)
 export const IconCalendar = p => (
   <Svg {...p}>
     <path d="M8 2v4M16 2v4" />
@@ -218,7 +235,7 @@ export function ToastProvider({ children }) {
     <ToastCtx.Provider value={toast}>
       {children}
       {msg && (
-        <div className="anim-toast fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900">
+        <div className="anim-toast fixed bottom-6 left-1/2 z-60 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900">
           {msg}
         </div>
       )}

@@ -19,6 +19,10 @@ and imported as JSON.
   final departure flight when you've added them.
 - **Drag to reorder** — smoothly re-arrange the order of places within a day
   (touch friendly, via dnd-kit).
+- **Done / skipped** — tap the circle on any plan to cycle planned → done →
+  skipped (skipped plans show struck-through and dimmed).
+- **Lives in the present** — opening a trip that spans today smoothly scrolls
+  to the current day; past days are dimmed until you hover them.
 - **Export / import** — back up everything or a single trip as a JSON file.
   Importing a file with a known trip id updates that trip; new ids are added.
 - **PWA** — installable, works fully offline after the first visit.
@@ -34,7 +38,6 @@ npm install
 npm run dev       # dev server
 npm run build     # production build → dist/
 npm run preview   # serve the production build locally
-npm run icons     # regenerate PNG icons in public/ (zero-dependency script)
 ```
 
 ## Deploying to Netlify

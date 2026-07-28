@@ -34,6 +34,7 @@ function normalizeItem(i) {
     time: str(i.time),
     mapsUrl: str(i.mapsUrl),
     notes: str(i.notes),
+    ...(['done', 'skipped'].includes(i.status) && { status: i.status }),
     ...(i.type === 'flight' && {
       flightNo: str(i.flightNo),
       direction: i.direction === 'departure' ? 'departure' : 'arrival',

@@ -55,7 +55,7 @@ export default function Home({ navigate }) {
     <div className="min-h-dvh">
       <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-slate-50/80 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/80">
         <div className="mx-auto flex h-14 max-w-2xl items-center gap-3 px-4">
-          <img src="/favicon.svg" alt="" className="size-7 rounded-lg" />
+          <img src="/icons/icon-128.png" alt="" className="size-7 rounded-lg" />
           <h1 className="flex-1 text-lg font-bold tracking-tight">Triplanner</h1>
           {state.trips.length > 0 && (
             <button className={btnPrimary} onClick={() => setCreating(true)}>

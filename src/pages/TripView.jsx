@@ -66,6 +66,19 @@ export default function TripView({ id, navigate }) {
     if (!trip) navigate('')
   }, [trip, navigate])
 
+  // On opening a trip that spans today, smoothly scroll to the current day.
+  useEffect(() => {
+    const days = trip?.days ?? []
+    const today = todayISO()
+    const idx = days.findIndex(d => d.date && d.date >= today)
+    if (idx <= 0) return
+    const t = setTimeout(() => {
+      document.getElementById(`day-${days[idx].id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 150)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per opened trip
+  }, [id])
+
   if (!trip) return null
 
   const stops = trip.days.reduce((n, d) => n + d.items.length, 0)
@@ -104,6 +117,7 @@ export default function TripView({ id, navigate }) {
   const modalDayIndex = itemModal ? trip.days.findIndex(d => d.id === itemModal.dayId) : -1
   const staysByDay = computeStays(trip)
   const { arrival, departure } = flightEndpoints(trip)
+  const today = todayISO()
 
   return (
     <div className="min-h-dvh">
@@ -159,6 +173,8 @@ export default function TripView({ id, navigate }) {
             day={day}
             index={i}
             stays={staysByDay[day.id]}
+            isPast={Boolean(day.date) && day.date < today}
+            isToday={day.date === today}
             onEditDay={() => setDayModal({ day, index: i })}
             onAddItem={() => setItemModal({ dayId: day.id })}
             onEditItem={item => setItemModal({ dayId: day.id, item })}

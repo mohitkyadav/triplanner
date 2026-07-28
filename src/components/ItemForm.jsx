@@ -5,10 +5,13 @@ import {
   btnGhost,
   btnPrimary,
   Field,
+  IconCheckCircle,
+  IconCircle,
   IconLogIn,
   IconLogOut,
   IconPlaneLanding,
   IconPlaneTakeoff,
+  IconXCircle,
   inputCls,
   Modal,
   Segmented,
@@ -25,6 +28,7 @@ const NOTE_HINTS = {
 export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose }) {
   const editing = Boolean(initial?.id)
   const [type, setType] = useState(initial?.type ?? 'landmark')
+  const [status, setStatus] = useState(initial?.status ?? 'planned')
   const [f, setF] = useState({
     title: initial?.title ?? '',
     time: initial?.time ?? '',
@@ -45,6 +49,7 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
       time: f.time,
       mapsUrl: f.mapsUrl.trim(),
       notes: f.notes.trim(),
+      status: status === 'planned' ? undefined : status,
     }
     if (type === 'flight') {
       item.flightNo = f.flightNo.trim()
@@ -151,6 +156,20 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
             placeholder={NOTE_HINTS[type] ?? 'Tickets, tips, what to look for…'}
           />
         </Field>
+
+        {editing && (
+          <Field label="Status">
+            <Segmented
+              value={status}
+              onChange={setStatus}
+              options={[
+                { value: 'planned', label: 'Planned', icon: IconCircle },
+                { value: 'done', label: 'Done', icon: IconCheckCircle },
+                { value: 'skipped', label: 'Skipped', icon: IconXCircle },
+              ]}
+            />
+          </Field>
+        )}
 
         <div className="flex items-center gap-2 pt-1">
           {editing && (
