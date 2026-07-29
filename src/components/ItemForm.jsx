@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { airlineFromFlightNo } from '../lib/airlines'
 import { CATEGORIES } from '../lib/categories'
+import AirlineLogo from './AirlineLogo'
 import {
   btnDanger,
   btnGhost,
@@ -68,6 +70,7 @@ export default function ItemForm({ initial, dayLabel, currency, onSave, onDelete
     type === 'flight' ? 'Label (optional)' : type === 'hotel' ? 'Hotel name' : 'Name'
   const titlePlaceholder =
     type === 'flight' ? 'e.g. Berlin → Lisbon' : type === 'hotel' ? 'e.g. Hotel Alfama' : 'e.g. Louvre Museum'
+  const airline = type === 'flight' ? airlineFromFlightNo(f.flightNo) : null
   const costLabel = currency ? `Cost (${currency})` : 'Cost (optional)'
   const costInput = (
     <input
@@ -119,6 +122,17 @@ export default function ItemForm({ initial, dayLabel, currency, onSave, onDelete
                 <PickerInput type="time" value={f.time} onChange={set('time')} />
               </Field>
             </div>
+            {airline && (
+              <div className="flex items-center gap-2 text-[13px] font-medium text-slate-500 dark:text-slate-400">
+                <AirlineLogo
+                  iata={airline.iata}
+                  name={airline.name}
+                  className="size-6 rounded-md"
+                  fallback={<span className="text-base leading-none">✈️</span>}
+                />
+                {airline.name}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Airport / location">
                 <input className={inputCls} value={f.location} onChange={set('location')} placeholder="Lisbon LIS" />

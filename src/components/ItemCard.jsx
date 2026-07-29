@@ -1,7 +1,9 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { airlineFromFlightNo } from '../lib/airlines'
 import { catById, mapsProvider, titleFor } from '../lib/categories'
 import { fmtMoney } from '../lib/money'
+import AirlineLogo from './AirlineLogo'
 import {
   IconApple,
   IconCheckCircle,
@@ -39,11 +41,17 @@ function Card({ item, currency, onEdit, onSetStatus, ghost, overlay, dragRef, dr
   const skipped = item.status === 'skipped'
   const maps = item.mapsUrl ? MAPS_META[mapsProvider(item.mapsUrl)] : null
 
+  const airline = item.type === 'flight' ? airlineFromFlightNo(item.flightNo) : null
+  const emojiBadge = (
+    <span className={`grid size-10 shrink-0 place-items-center rounded-xl text-lg ${cat.badge}`}>{cat.emoji}</span>
+  )
+
   let MetaIcon = null
   let metaText = ''
   if (item.type === 'flight') {
     MetaIcon = item.direction === 'departure' ? IconPlaneTakeoff : IconPlaneLanding
     metaText = item.direction === 'departure' ? 'Departure' : 'Arrival'
+    if (airline) metaText = `${airline.name} · ${metaText}`
     if (item.location) metaText += ` · ${item.location}`
   } else if (item.type === 'hotel') {
     MetaIcon = item.hotelAction === 'check-out' ? IconLogOut : IconLogIn
@@ -75,9 +83,11 @@ function Card({ item, currency, onEdit, onSetStatus, ghost, overlay, dragRef, dr
         className={`flex min-w-0 flex-1 cursor-pointer items-start gap-3 ${skipped ? 'opacity-50' : ''}`}
         onClick={onEdit}
       >
-        <span className={`grid size-10 shrink-0 place-items-center rounded-xl text-lg ${cat.badge}`}>
-          {cat.emoji}
-        </span>
+        {airline ? (
+          <AirlineLogo iata={airline.iata} name={airline.name} className="size-10 rounded-xl" fallback={emojiBadge} />
+        ) : (
+          emojiBadge
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className={`min-w-0 flex-1 truncate font-medium ${skipped ? 'line-through' : ''}`}>{title}</span>

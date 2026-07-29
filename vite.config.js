@@ -10,6 +10,20 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png'],
+      workbox: {
+        // Airline logos keep working offline once seen (opaque responses ok).
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/images\.kiwi\.com\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'airline-logos',
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'Triplanner',
         short_name: 'Triplanner',

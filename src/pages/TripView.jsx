@@ -10,6 +10,7 @@ import {
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useEffect, useRef, useState } from 'react'
+import AirlineLogo from '../components/AirlineLogo'
 import DayCard from '../components/DayCard'
 import DayForm from '../components/DayForm'
 import { ItemCardOverlay } from '../components/ItemCard'
@@ -33,6 +34,7 @@ import {
   iconBtn,
   useToast,
 } from '../components/ui'
+import { airlineFromFlightNo } from '../lib/airlines'
 import { addDaysISO, fmtDate, fmtRange, todayISO } from '../lib/dates'
 import { tripToICS } from '../lib/ics'
 import { downloadFile, downloadJSON, exportPayload, slug } from '../lib/io'
@@ -55,12 +57,20 @@ function flightEndpoints(trip) {
 }
 
 function FlightRow({ icon: Icon, label, item, day }) {
-  const sub = [fmtDate(day.date), item.time, item.location].filter(Boolean).join(' · ')
+  const airline = airlineFromFlightNo(item.flightNo)
+  const sub = [airline?.name, fmtDate(day.date), item.time, item.location].filter(Boolean).join(' · ')
+  const planeChip = (
+    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
+      <Icon className="size-4.5" />
+    </span>
+  )
   return (
     <div className="flex items-center gap-3 px-5 py-3">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
-        <Icon className="size-4.5" />
-      </span>
+      {airline ? (
+        <AirlineLogo iata={airline.iata} name={airline.name} className="size-9 rounded-lg" fallback={planeChip} />
+      ) : (
+        planeChip
+      )}
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">
           {label}
@@ -297,6 +307,7 @@ export default function TripView({ id, navigate }) {
           <IconPlus className="size-5" />
           Add day {trip.days.length + 1}
         </button>
+
       </main>
 
       {itemModal && (

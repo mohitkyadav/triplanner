@@ -13,6 +13,10 @@ and imported as JSON.
   here…"), an optional time, and a maps link.
 - **Maps links** — paste a Google or Apple Maps link and the card shows the
   matching provider icon.
+- **Airline names & logos** — type a flight number ("LH 1178") and the app
+  derives the airline: the name comes from a bundled offline dataset, the
+  logo from a keyless CDN (see below). Shown on flight cards, the trip banner
+  and live in the flight form.
 - **Computed hotel stays** — add a check-in and a check-out; the days in
   between automatically show a subdued "Staying at …" strip.
 - **Smart trip banner** — the trip card surfaces the arrival flight and the
@@ -58,6 +62,20 @@ npm run dev       # dev server
 npm run build     # production build → dist/
 npm run preview   # serve the production build locally
 ```
+
+## Airline names & logos
+
+- **Names** are fully offline: `src/lib/airlines-data.js` maps IATA codes to
+  airline names (970 airlines, generated from the OpenFlights database by
+  `node scripts/gen-airlines.mjs` — rerun it to refresh, overrides live in the
+  script).
+- **Logos** load from Kiwi.com's keyless CDN
+  (`images.kiwi.com/airlines/128/{IATA}.png`) — square symbol-only marks, no
+  watermark, no key, no signup. It's an informal public CDN (no SLA), which
+  is fine here because the UI never depends on it: if a logo can't load, the
+  card falls back to the ✈️ emoji.
+- Logos are runtime-cached by the service worker, so they keep working
+  offline after they've been seen once.
 
 ## Deploying to Netlify
 
