@@ -22,8 +22,10 @@ import {
   IconArrowLeft,
   IconCalendar,
   IconCalendarPlus,
+  IconChevronRight,
   IconDownload,
   IconMapPin,
+  IconNavigation,
   IconPencil,
   IconPlaneLanding,
   IconPlaneTakeoff,
@@ -171,6 +173,7 @@ export default function TripView({ id, navigate }) {
   const { arrival, departure } = flightEndpoints(trip)
   const totalCost = tripCost(trip)
   const today = todayISO()
+  const todayIndex = trip.days.findIndex(d => d.date === today)
 
   const dayOfItem = itemId => trip.days.find(d => d.items.some(i => i.id === itemId))
   const dayById = dayId => trip.days.find(d => d.id === dayId)
@@ -223,6 +226,14 @@ export default function TripView({ id, navigate }) {
             <IconArrowLeft />
           </button>
           <h1 className="min-w-0 flex-1 truncate px-1 font-semibold">{trip.name}</h1>
+          <button
+            className={iconBtn}
+            onClick={() => navigate(`/trip/${trip.id}/today`)}
+            aria-label="Trip mode"
+            title="Trip mode — now and next"
+          >
+            <IconNavigation className="size-4.5" />
+          </button>
           <button className={iconBtn} onClick={() => setSharing(true)} aria-label="Share trip">
             <IconShare className="size-4.5" />
           </button>
@@ -269,6 +280,23 @@ export default function TripView({ id, navigate }) {
                 <FlightRow icon={IconPlaneTakeoff} label="Departure" item={departure.item} day={departure.day} />
               )}
             </div>
+          )}
+          {todayIndex >= 0 && (
+            <button
+              onClick={() => navigate(`/trip/${trip.id}/today`)}
+              className="flex w-full items-center gap-3 border-t border-slate-100 px-5 py-3 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
+            >
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 text-amber-700 dark:text-amber-400">
+                <IconNavigation className="size-4.5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">Trip mode · day {todayIndex + 1}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                  What runs now, what comes next, and the free time between
+                </span>
+              </span>
+              <IconChevronRight className="size-4.5 shrink-0 text-slate-400" />
+            </button>
           )}
         </div>
 

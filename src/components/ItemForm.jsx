@@ -83,6 +83,7 @@ export default function ItemForm({ initial, dayLabel, currency, onSave, onDelete
     />
   )
 
+
   return (
     <Modal title={editing ? 'Edit plan' : `Add to ${dayLabel}`} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">

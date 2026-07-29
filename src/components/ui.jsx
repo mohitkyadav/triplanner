@@ -214,6 +214,61 @@ export const IconCheck = p => (
     <path d="M20 6 9 17l-5-5" />
   </Svg>
 )
+export const IconChevronLeft = p => (
+  <Svg {...p}>
+    <path d="m15 18-6-6 6-6" />
+  </Svg>
+)
+export const IconChevronRight = p => (
+  <Svg {...p}>
+    <path d="m9 18 6-6-6-6" />
+  </Svg>
+)
+export const IconNavigation = p => (
+  <Svg {...p}>
+    <path d="M3 11l19-9-9 19-2-8-8-2z" />
+  </Svg>
+)
+export const IconAlert = p => (
+  <Svg {...p}>
+    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    <path d="M12 9v4M12 17h.01" />
+  </Svg>
+)
+export const IconShield = p => (
+  <Svg {...p}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </Svg>
+)
+export const IconShieldCheck = p => (
+  <Svg {...p}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <path d="m9 12 2 2 4-4" />
+  </Svg>
+)
+export const IconRotate = p => (
+  <Svg {...p}>
+    <path d="M3 12a9 9 0 1 0 3-6.7" />
+    <path d="M3 4v5h5" />
+  </Svg>
+)
+export const IconFolder = p => (
+  <Svg {...p}>
+    <path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z" />
+  </Svg>
+)
+export const IconInstall = p => (
+  <Svg {...p}>
+    <rect x="5" y="2" width="14" height="20" rx="2" />
+    <path d="M12 7v7M9 11l3 3 3-3" />
+  </Svg>
+)
+export const IconHourglass = p => (
+  <Svg {...p}>
+    <path d="M6 2h12M6 22h12" />
+    <path d="M6 2c0 4 6 6 6 10s-6 6-6 10M18 2c0 4-6 6-6 10s6 6 6 10" />
+  </Svg>
+)
 
 /* ---------- shared class strings ---------- */
 
@@ -225,6 +280,11 @@ export const btnDanger =
   'inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10'
 export const iconBtn =
   'rounded-lg p-2 text-slate-500 transition hover:bg-slate-200/60 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+// Small buttons that sit inside cards and rows.
+export const btnChip =
+  'inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-[.98] dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+export const btnChipBrand =
+  'inline-flex items-center gap-1.5 rounded-lg bg-brand px-2.5 py-1.5 text-[13px] font-semibold text-white transition hover:bg-brand-600 active:scale-[.98] dark:bg-brand-600 dark:hover:bg-brand-500'
 // 16px minimum on editable fields — anything smaller triggers iOS Safari's
 // auto-zoom on focus, which leaves the page horizontally scrollable.
 export const inputCls =

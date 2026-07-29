@@ -1,13 +1,20 @@
 # Triplanner ✈️
 
-A fast, offline-first PWA for planning trips day by day. All data lives in your
-browser's localStorage — nothing ever leaves your device — and can be exported
-and imported as JSON.
+A fast, offline-first PWA for planning trips day by day. All data lives on your
+device — nothing ever leaves it — and can be exported and imported as JSON.
 
 ## Features
 
 - **Trips → days → plans** — create a trip (days are auto-generated from the
   date range), then fill each day with flights, hotel check-ins/outs and places.
+- **Trip mode** — the view for the days of the trip itself: the plan you are on
+  *now*, the plan that comes *next*, how long it is until then, a directions
+  link for the hop, and one tap to mark a plan done or skipped. Two plans that
+  start at the same time are flagged, and plans that started earlier without a
+  result are collected under "Not marked yet". Reach it from the trip banner or
+  the header (➤ icon). A plan keeps a start time and nothing more — the app
+  never guesses how long a plan runs, so the plan you are on is simply the one
+  that started last.
 - **14 place types** — restaurant, museum, park, landmark, café, nightlife,
   beach, shopping, activity, work and more, each with notes ("what to eat
   here…"), an optional time, and a maps link.
@@ -47,6 +54,9 @@ and imported as JSON.
   live.
 - **Export / import** — back up everything or a single trip as a JSON file.
   Importing a file with a known trip id updates that trip; new ids are added.
+- **Keeps your trips safe** — see [Durability](#durability) below: an automatic
+  backup file, a second copy on the device, storage protection and an install
+  nudge, all in one card on the home screen.
 - **PWA** — installable, works fully offline after the first visit.
 
 ## Stack
@@ -62,6 +72,31 @@ npm run dev       # dev server
 npm run build     # production build → dist/
 npm run preview   # serve the production build locally
 ```
+
+## Durability
+
+`localStorage` alone is not enough for a trip plan: the write can fail when the
+quota is full, and browsers clear the storage of a page the user did not install
+(iOS Safari after 7 days without a visit). `src/lib/backup.js` therefore keeps
+three defences, weakest first:
+
+1. **`navigator.storage.persist()`** — asked for at every start, and offered
+   again as a button. Chrome answers from its own engagement rules; Firefox
+   prompts; Safari gives the guarantee only to an installed app.
+2. **An IndexedDB copy** — written 1.2 s after every change. It survives a
+   failed or damaged `localStorage` write. When `localStorage` comes back with
+   *nothing readable*, the app restores from this copy on its own and says so.
+   A user who deleted every trip is safe: the copy follows deletions, so only a
+   missing or damaged key triggers the restore.
+3. **An automatic backup file** — the user picks one file through the File
+   System Access API and the app rewrites it 5 s after every change, plus once
+   more when the tab is hidden. This is the only copy that outlives the browser
+   profile. Chrome and Edge only; the card falls back to the install nudge and a
+   manual export elsewhere.
+
+Both writes are debounced and flushed on `visibilitychange`/`pagehide`. Every
+step fails softly — a private window may refuse IndexedDB completely, and the
+app stays usable.
 
 ## Airline names & logos
 
@@ -112,7 +147,7 @@ Exports look like:
           "items": [
             { "id": "…", "type": "flight", "flightNo": "LH 1178", "direction": "arrival", "location": "Lisbon LIS", "time": "10:35", "title": "", "mapsUrl": "", "notes": "", "cost": 120 },
             { "id": "…", "type": "hotel", "hotelAction": "check-in", "title": "Hotel Alfama", "time": "15:00", "mapsUrl": "", "notes": "", "cost": 240 },
-            { "id": "…", "type": "restaurant", "title": "Cervejaria Ramiro", "time": "", "mapsUrl": "", "notes": "Garlic prawns, tiger shrimp" }
+            { "id": "…", "type": "restaurant", "title": "Cervejaria Ramiro", "time": "13:00", "mapsUrl": "", "notes": "Garlic prawns, tiger shrimp" }
           ]
         }
       ],
@@ -126,7 +161,9 @@ Exports look like:
 `cost` (number) and `currency` (ISO 4217 code) are optional; `packing` is the
 trip's checklist.
 
-Storage key: `triplanner:v1`.
+Storage: `localStorage` key `triplanner:v1`, mirrored to the `snapshot` record
+of the `kv` store in the `triplanner` IndexedDB database (see
+[Durability](#durability)).
 
 ## Share format
 

@@ -1,4 +1,4 @@
-import { uid } from './store'
+import { uid } from './uid'
 
 export function downloadFile(filename, content, type) {
   const blob = new Blob([content], { type })
@@ -86,6 +86,13 @@ function normalizeTrip(t) {
   }
 }
 
+// Accepts an export payload or a bare array of trips.
+export function normalizeTrips(data) {
+  const trips = Array.isArray(data) ? data : data?.trips
+  if (!Array.isArray(trips) || trips.length === 0) throw new Error('no trips found in file')
+  return trips.map(normalizeTrip)
+}
+
 export function parseImport(text) {
   let data
   try {
@@ -93,7 +100,5 @@ export function parseImport(text) {
   } catch {
     throw new Error('not a valid JSON file')
   }
-  const trips = Array.isArray(data) ? data : data?.trips
-  if (!Array.isArray(trips) || trips.length === 0) throw new Error('no trips found in file')
-  return trips.map(normalizeTrip)
+  return normalizeTrips(data)
 }

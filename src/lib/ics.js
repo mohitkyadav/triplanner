@@ -1,9 +1,11 @@
 import { catById, titleFor } from './categories'
 import { addDaysISO } from './dates'
+import { fmtClock, toMinutes } from './schedule'
 
-// iCalendar (RFC 5545) export. Timed plans become 1-hour events in floating
-// local time (no timezone suffix), which calendar apps show at the trip's
-// wall-clock time. The trip itself becomes one all-day banner event.
+// iCalendar (RFC 5545) export. A plan keeps no length, but a calendar event
+// needs an end, so a timed plan becomes a 1-hour block in floating local time
+// (no timezone suffix), which calendar apps show at the trip's wall-clock time.
+// The trip itself becomes one all-day banner event.
 
 const esc = s =>
   String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
@@ -22,6 +24,7 @@ function fold(line) {
 }
 
 const dateBasic = iso => iso.replaceAll('-', '')
+const timeBasic = min => `${fmtClock(min).replace(':', '')}00`
 const dtstamp = () => new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
 
 function vevent(fields) {
@@ -59,11 +62,13 @@ export function tripToICS(trip) {
   for (const day of trip.days) {
     if (!day.date) continue
     for (const item of day.items) {
-      if (!item.time || item.status === 'skipped') continue
-      const [h, m] = item.time.split(':').map(Number)
-      const start = `${dateBasic(day.date)}T${item.time.replace(':', '')}00`
-      const endDate = h + 1 > 23 ? addDaysISO(day.date, 1) : day.date
-      const end = `${dateBasic(endDate)}T${String((h + 1) % 24).padStart(2, '0')}${String(m).padStart(2, '0')}00`
+      if (item.status === 'skipped') continue
+      const startMin = toMinutes(item.time)
+      if (startMin == null) continue
+      const endMin = startMin + 60
+      const start = `${dateBasic(day.date)}T${timeBasic(startMin)}`
+      // A plan can run past midnight, so the end may land on the next day.
+      const end = `${dateBasic(addDaysISO(day.date, Math.floor(endMin / 1440)))}T${timeBasic(endMin)}`
       lines.push(
         ...vevent([
           ['UID', `${item.id}@triplanner`],

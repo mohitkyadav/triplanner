@@ -1,26 +1,40 @@
-import { createContext, useContext, useEffect, useReducer } from 'react'
+import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
+import { readMirror, requestPersistence, scheduleBackup } from './backup'
 import { addDaysISO, daysBetween } from './dates'
+import { normalizeTrips } from './io'
+import { uid } from './uid'
 
 const KEY = 'triplanner:v1'
 
-export const uid = () =>
-  globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36)
+export { uid }
+
+// True when localStorage held nothing readable — the browser cleared it, the
+// value was damaged, or this is a first visit. Only then may the app restore
+// from the IndexedDB copy: the copy follows deletions too, so a user who
+// removed every trip must not get them back.
+let storageWasEmpty = false
 
 function load() {
   try {
-    const data = JSON.parse(localStorage.getItem(KEY))
-    if (data && Array.isArray(data.trips)) return { trips: data.trips }
+    const raw = localStorage.getItem(KEY)
+    if (raw !== null) {
+      const data = JSON.parse(raw)
+      if (data && Array.isArray(data.trips)) return { trips: data.trips }
+    }
   } catch {
     // corrupted storage — start fresh rather than crash
   }
+  storageWasEmpty = true
   return { trips: [] }
 }
 
 function save(state) {
   try {
     localStorage.setItem(KEY, JSON.stringify(state))
+    return true
   } catch {
-    // storage full or unavailable — keep the app usable in memory
+    // storage full or unavailable — the IndexedDB copy keeps the data safe
+    return false
   }
 }
 
@@ -153,9 +167,36 @@ function reducer(state, a) {
 
 const StoreCtx = createContext(null)
 
-export function StoreProvider({ children }) {
+export function StoreProvider({ children, onRecover }) {
   const [state, dispatch] = useReducer(reducer, null, load)
-  useEffect(() => save(state), [state])
+  const recovered = useRef(false)
+
+  useEffect(() => {
+    save(state)
+    scheduleBackup(state.trips) // IndexedDB copy + the automatic backup file
+  }, [state])
+
+  useEffect(() => {
+    requestPersistence()
+  }, [])
+
+  // localStorage came back empty. If the IndexedDB copy survived, the trips
+  // are still there — bring them back.
+  useEffect(() => {
+    if (!storageWasEmpty || recovered.current) return
+    recovered.current = true
+    readMirror()
+      .then(snapshot => {
+        if (!snapshot?.trips?.length) return
+        const trips = normalizeTrips(snapshot)
+        dispatch({ type: 'data/import', trips })
+        onRecover?.(trips.length)
+      })
+      .catch(() => {
+        // no readable copy — nothing to bring back
+      })
+  }, [onRecover])
+
   return <StoreCtx.Provider value={{ state, dispatch }}>{children}</StoreCtx.Provider>
 }
 

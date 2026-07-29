@@ -1,18 +1,9 @@
 import { useRef, useState } from 'react'
+import DataSafety from '../components/DataSafety'
 import ScanModal from '../components/ScanModal'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import TripForm from '../components/TripForm'
-import {
-  IconDownload,
-  IconPlus,
-  IconQrCode,
-  IconTrash,
-  IconUpload,
-  btnGhost,
-  btnPrimary,
-  iconBtn,
-  useToast,
-} from '../components/ui'
+import { IconPlus, IconQrCode, IconTrash, IconUpload, btnGhost, btnPrimary, iconBtn, useToast } from '../components/ui'
 import { fmtRange, todayISO } from '../lib/dates'
 import { downloadJSON, exportPayload, parseImport } from '../lib/io'
 import { makeTrip, useStore } from '../lib/store'
@@ -152,20 +143,8 @@ export default function Home({ navigate }) {
               })}
             </ul>
 
-            <div className="mt-8 flex flex-col items-center gap-1">
-              <div className="flex gap-2">
-                <button className={btnGhost} onClick={exportAll}>
-                  <IconDownload className="size-4" />
-                  Export all
-                </button>
-                <button className={btnGhost} onClick={() => fileRef.current?.click()}>
-                  <IconUpload className="size-4" />
-                  Import
-                </button>
-              </div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
-                Everything lives in this browser — export now and then to back up.
-              </p>
+            <div className="mt-6">
+              <DataSafety onExport={exportAll} onImport={() => fileRef.current?.click()} />
             </div>
           </>
         )}
