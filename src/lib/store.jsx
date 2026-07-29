@@ -38,14 +38,20 @@ export function makeDay(date = '') {
   return { id: uid(), date, title: '', items: [] }
 }
 
-export function makeTrip({ name, destination = '', startDate = '', endDate = '' }) {
+export function makeTrip({ name, destination = '', startDate = '', endDate = '', currency = '' }) {
   const now = new Date().toISOString()
   const days = []
   if (startDate) {
     const count = endDate ? Math.min(Math.max(daysBetween(startDate, endDate) + 1, 1), 90) : 1
     for (let i = 0; i < count; i++) days.push(makeDay(addDaysISO(startDate, i)))
   }
-  return { id: uid(), name, destination, startDate, endDate, createdAt: now, updatedAt: now, days }
+  return { id: uid(), name, destination, startDate, endDate, currency, createdAt: now, updatedAt: now, days, packing: [] }
+}
+
+const insertAt = (arr, item, index) => {
+  const copy = [...arr]
+  copy.splice(index >= 0 && index <= copy.length ? index : copy.length, 0, item)
+  return copy
 }
 
 const touch = trip => ({ ...trip, updatedAt: new Date().toISOString() })
@@ -68,6 +74,8 @@ function reducer(state, a) {
       return mapTrip(state, a.id, t => ({ ...t, ...a.patch }))
     case 'trip/delete':
       return { ...state, trips: state.trips.filter(t => t.id !== a.id) }
+    case 'trip/restore':
+      return { ...state, trips: insertAt(state.trips, a.trip, a.index) }
     case 'day/add':
       return mapTrip(state, a.tripId, t => ({ ...t, days: sortDays([...t.days, a.day]) }))
     case 'day/update':
@@ -78,7 +86,9 @@ function reducer(state, a) {
     case 'day/delete':
       return mapTrip(state, a.tripId, t => ({ ...t, days: t.days.filter(d => d.id !== a.dayId) }))
     case 'item/add':
-      return mapTrip(state, a.tripId, t => mapDay(t, a.dayId, d => ({ ...d, items: [...d.items, a.item] })))
+      return mapTrip(state, a.tripId, t =>
+        mapDay(t, a.dayId, d => ({ ...d, items: insertAt(d.items, a.item, a.index ?? d.items.length) })),
+      )
     case 'item/update':
       return mapTrip(state, a.tripId, t =>
         mapDay(t, a.dayId, d => ({
@@ -118,6 +128,15 @@ function reducer(state, a) {
       })
     case 'trip/setDays':
       return mapTrip(state, a.tripId, t => ({ ...t, days: a.days }))
+    case 'packing/add':
+      return mapTrip(state, a.tripId, t => ({ ...t, packing: [...(t.packing ?? []), a.item] }))
+    case 'packing/toggle':
+      return mapTrip(state, a.tripId, t => ({
+        ...t,
+        packing: (t.packing ?? []).map(p => (p.id === a.itemId ? { ...p, done: !p.done } : p)),
+      }))
+    case 'packing/delete':
+      return mapTrip(state, a.tripId, t => ({ ...t, packing: (t.packing ?? []).filter(p => p.id !== a.itemId) }))
     case 'data/import': {
       // Trips with a known id replace the existing one (round-trip friendly);
       // everything else is added on top.

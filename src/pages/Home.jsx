@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
+import ScanModal from '../components/ScanModal'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import TripForm from '../components/TripForm'
 import {
   IconDownload,
   IconPlus,
+  IconQrCode,
   IconTrash,
   IconUpload,
   btnGhost,
@@ -19,6 +21,7 @@ export default function Home({ navigate }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const [creating, setCreating] = useState(false)
+  const [scanning, setScanning] = useState(false)
   const fileRef = useRef(null)
 
   function createTrip(data) {
@@ -47,9 +50,20 @@ export default function Home({ navigate }) {
   }
 
   function deleteTrip(trip) {
-    if (window.confirm(`Delete the trip “${trip.name}”? This cannot be undone.`)) {
-      dispatch({ type: 'trip/delete', id: trip.id })
-    }
+    if (!window.confirm(`Delete the trip “${trip.name}”?`)) return
+    const index = state.trips.findIndex(t => t.id === trip.id)
+    dispatch({ type: 'trip/delete', id: trip.id })
+    toast('Trip deleted', {
+      label: 'Undo',
+      onClick: () => dispatch({ type: 'trip/restore', trip, index }),
+    })
+  }
+
+  function importScanned(trips) {
+    dispatch({ type: 'data/import', trips })
+    setScanning(false)
+    toast(`Added “${trips[0].name}”`)
+    navigate(`/trip/${trips[0].id}`)
   }
 
   return (
@@ -58,6 +72,9 @@ export default function Home({ navigate }) {
         <div className="mx-auto flex h-14 max-w-2xl items-center gap-3 px-4">
           <img src="/icons/icon-128.png" alt="" className="size-7 rounded-lg" />
           <h1 className="flex-1 text-lg font-bold tracking-tight">Triplanner</h1>
+          <button className={iconBtn} onClick={() => setScanning(true)} aria-label="Scan a shared trip">
+            <IconQrCode className="size-4.5" />
+          </button>
           {state.trips.length > 0 && (
             <button className={btnPrimary} onClick={() => setCreating(true)}>
               <IconPlus className="size-4" />
@@ -81,10 +98,16 @@ export default function Home({ navigate }) {
               <IconPlus className="size-4" />
               New trip
             </button>
-            <button className={btnGhost} onClick={() => fileRef.current?.click()}>
-              <IconUpload className="size-4" />
-              Import a backup
-            </button>
+            <div className="flex gap-2">
+              <button className={btnGhost} onClick={() => setScanning(true)}>
+                <IconQrCode className="size-4" />
+                Scan a shared trip
+              </button>
+              <button className={btnGhost} onClick={() => fileRef.current?.click()}>
+                <IconUpload className="size-4" />
+                Import a backup
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -154,6 +177,7 @@ export default function Home({ navigate }) {
 
       <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={importFile} />
       {creating && <TripForm onSave={createTrip} onClose={() => setCreating(false)} />}
+      {scanning && <ScanModal onImport={importScanned} onClose={() => setScanning(false)} />}
     </div>
   )
 }

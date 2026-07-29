@@ -26,13 +26,14 @@ const NOTE_HINTS = {
   work: 'Meetings, calls, focus blocks…',
 }
 
-export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose }) {
+export default function ItemForm({ initial, dayLabel, currency, onSave, onDelete, onClose }) {
   const editing = Boolean(initial?.id)
   const [type, setType] = useState(initial?.type ?? 'landmark')
   const [status, setStatus] = useState(initial?.status ?? 'planned')
   const [f, setF] = useState({
     title: initial?.title ?? '',
     time: initial?.time ?? '',
+    cost: initial?.cost != null ? String(initial.cost) : '',
     mapsUrl: initial?.mapsUrl ?? '',
     notes: initial?.notes ?? '',
     flightNo: initial?.flightNo ?? '',
@@ -44,10 +45,12 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
 
   function submit(e) {
     e.preventDefault()
+    const cost = parseFloat(f.cost.replace(',', '.'))
     const item = {
       type,
       title: f.title.trim(),
       time: f.time,
+      cost: Number.isFinite(cost) && cost > 0 ? Math.round(cost * 100) / 100 : undefined,
       mapsUrl: f.mapsUrl.trim(),
       notes: f.notes.trim(),
       status: status === 'planned' ? undefined : status,
@@ -65,6 +68,17 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
     type === 'flight' ? 'Label (optional)' : type === 'hotel' ? 'Hotel name' : 'Name'
   const titlePlaceholder =
     type === 'flight' ? 'e.g. Berlin → Lisbon' : type === 'hotel' ? 'e.g. Hotel Alfama' : 'e.g. Louvre Museum'
+  const costLabel = currency ? `Cost (${currency})` : 'Cost (optional)'
+  const costInput = (
+    <input
+      className={inputCls}
+      value={f.cost}
+      onChange={set('cost')}
+      placeholder="0"
+      inputMode="decimal"
+      pattern="[0-9]*[.,]?[0-9]*"
+    />
+  )
 
   return (
     <Modal title={editing ? 'Edit plan' : `Add to ${dayLabel}`} onClose={onClose}>
@@ -105,9 +119,12 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
                 <PickerInput type="time" value={f.time} onChange={set('time')} />
               </Field>
             </div>
-            <Field label="Airport / location">
-              <input className={inputCls} value={f.location} onChange={set('location')} placeholder="Lisbon LIS" />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Airport / location">
+                <input className={inputCls} value={f.location} onChange={set('location')} placeholder="Lisbon LIS" />
+              </Field>
+              <Field label={costLabel}>{costInput}</Field>
+            </div>
           </>
         )}
 
@@ -134,9 +151,12 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
         </Field>
 
         {type !== 'flight' && (
-          <Field label="Time (optional)">
-            <PickerInput type="time" value={f.time} onChange={set('time')} />
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Time (optional)">
+              <PickerInput type="time" value={f.time} onChange={set('time')} />
+            </Field>
+            <Field label={costLabel}>{costInput}</Field>
+          </div>
         )}
 
         <Field label="Maps link (optional)">
@@ -174,11 +194,7 @@ export default function ItemForm({ initial, dayLabel, onSave, onDelete, onClose 
 
         <div className="flex items-center gap-2 pt-1">
           {editing && (
-            <button
-              type="button"
-              className={btnDanger}
-              onClick={() => window.confirm('Delete this from the plan?') && onDelete()}
-            >
+            <button type="button" className={btnDanger} onClick={onDelete}>
               Delete
             </button>
           )}

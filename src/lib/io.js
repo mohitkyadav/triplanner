@@ -1,7 +1,7 @@
 import { uid } from './store'
 
-export function downloadJSON(filename, obj) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' })
+export function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -9,6 +9,9 @@ export function downloadJSON(filename, obj) {
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
+
+export const downloadJSON = (filename, obj) =>
+  downloadFile(filename, JSON.stringify(obj, null, 2), 'application/json')
 
 export const exportPayload = trips => ({
   app: 'triplanner',
@@ -34,6 +37,7 @@ function normalizeItem(i) {
     time: str(i.time),
     mapsUrl: str(i.mapsUrl),
     notes: str(i.notes),
+    ...(Number.isFinite(+i.cost) && +i.cost > 0 && { cost: Math.round(+i.cost * 100) / 100 }),
     ...(['done', 'skipped'].includes(i.status) && { status: i.status }),
     ...(i.type === 'flight' && {
       flightNo: str(i.flightNo),
@@ -56,6 +60,15 @@ function normalizeDay(d) {
   }
 }
 
+function normalizePacking(p) {
+  if (!p || typeof p !== 'object') throw new Error('invalid packing item')
+  return {
+    id: typeof p.id === 'string' ? p.id : uid(),
+    text: str(p.text),
+    done: Boolean(p.done),
+  }
+}
+
 function normalizeTrip(t) {
   if (!t || typeof t !== 'object' || !t.name) throw new Error('invalid trip entry')
   const now = new Date().toISOString()
@@ -65,9 +78,11 @@ function normalizeTrip(t) {
     destination: str(t.destination),
     startDate: str(t.startDate),
     endDate: str(t.endDate),
+    currency: str(t.currency).toUpperCase().slice(0, 3),
     createdAt: str(t.createdAt) || now,
     updatedAt: str(t.updatedAt) || now,
     days: Array.isArray(t.days) ? t.days.map(normalizeDay) : [],
+    packing: Array.isArray(t.packing) ? t.packing.map(normalizePacking).filter(p => p.text) : [],
   }
 }
 

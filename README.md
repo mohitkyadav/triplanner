@@ -21,6 +21,21 @@ and imported as JSON.
   (touch friendly, via dnd-kit).
 - **Done / skipped** — tap the circle on any plan to cycle planned → done →
   skipped (skipped plans show struck-through and dimmed).
+- **Costs & budget** — give any plan an optional cost and the trip a currency;
+  each day shows its subtotal and the trip banner shows the total (skipped
+  plans don't count).
+- **Day routes** — the route icon on a day header opens all of that day's
+  stops as a Google Maps directions route, in order. No API key needed.
+- **Share via link or QR** — the whole trip is compressed into the link
+  itself (nothing is uploaded). Small trips fit a single QR any camera can
+  open; big trips show an *animated* multi-part QR that the built-in scanner
+  (QR icon on the home screen) reassembles — works for any trip size, offline.
+- **Add to calendar** — export the trip as an `.ics` file: one all-day event
+  for the trip plus an event for every timed plan.
+- **Undo deletes** — deleting a plan, day or trip shows an Undo toast instead
+  of being unrecoverable.
+- **Packing list** — a per-trip checklist that lives above the days
+  (tap to expand, check things off as you pack).
 - **Lives in the present** — opening a trip that spans today smoothly scrolls
   to the current day; past days are dimmed until you hover them.
 - **Light / Dark / System theme** — switcher on the home screen; the choice is
@@ -32,7 +47,8 @@ and imported as JSON.
 
 ## Stack
 
-Vite · React 18 · Tailwind CSS v4 · dnd-kit · vite-plugin-pwa
+Vite · React 18 · Tailwind CSS v4 · dnd-kit · vite-plugin-pwa · qrcode +
+jsQR (lazy-loaded only when sharing/scanning)
 
 ## Development
 
@@ -76,15 +92,32 @@ Exports look like:
           "date": "2026-08-01",
           "title": "",
           "items": [
-            { "id": "…", "type": "flight", "flightNo": "LH 1178", "direction": "arrival", "location": "Lisbon LIS", "time": "10:35", "title": "", "mapsUrl": "", "notes": "" },
-            { "id": "…", "type": "hotel", "hotelAction": "check-in", "title": "Hotel Alfama", "time": "15:00", "mapsUrl": "", "notes": "" },
+            { "id": "…", "type": "flight", "flightNo": "LH 1178", "direction": "arrival", "location": "Lisbon LIS", "time": "10:35", "title": "", "mapsUrl": "", "notes": "", "cost": 120 },
+            { "id": "…", "type": "hotel", "hotelAction": "check-in", "title": "Hotel Alfama", "time": "15:00", "mapsUrl": "", "notes": "", "cost": 240 },
             { "id": "…", "type": "restaurant", "title": "Cervejaria Ramiro", "time": "", "mapsUrl": "", "notes": "Garlic prawns, tiger shrimp" }
           ]
         }
-      ]
+      ],
+      "currency": "EUR",
+      "packing": [{ "id": "…", "text": "Passport", "done": false }]
     }
   ]
 }
 ```
 
+`cost` (number) and `currency` (ISO 4217 code) are optional; `packing` is the
+trip's checklist.
+
 Storage key: `triplanner:v1`.
+
+## Share format
+
+Share links look like `https://…/#/share/<payload>` where `<payload>` is the
+export JSON for one trip, deflate-raw-compressed and base64url-encoded, with a
+`1.` scheme prefix (`0.` = uncompressed fallback for browsers without
+`CompressionStream`). Decoding happens entirely on the receiving device.
+
+QR codes carry the share URL directly when it fits (≤ 1200 chars). Bigger
+payloads are split into 800-char chunks and shown as an animated sequence of
+frames — `TQR:<id>:<index>:<total>:<chunk>` — which the in-app scanner
+collects in any order until the set is complete.

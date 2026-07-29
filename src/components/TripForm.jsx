@@ -8,6 +8,7 @@ export default function TripForm({ initial, onSave, onClose }) {
     destination: initial?.destination ?? '',
     startDate: initial?.startDate ?? '',
     endDate: initial?.endDate ?? '',
+    currency: initial?.currency ?? '',
   })
   const set = k => e => setF(prev => ({ ...prev, [k]: e.target.value }))
 
@@ -15,7 +16,13 @@ export default function TripForm({ initial, onSave, onClose }) {
     e.preventDefault()
     let { startDate, endDate } = f
     if (startDate && endDate && endDate < startDate) [startDate, endDate] = [endDate, startDate]
-    onSave({ name: f.name.trim(), destination: f.destination.trim(), startDate, endDate })
+    onSave({
+      name: f.name.trim(),
+      destination: f.destination.trim(),
+      startDate,
+      endDate,
+      currency: f.currency.trim().toUpperCase(),
+    })
   }
 
   return (
@@ -31,9 +38,21 @@ export default function TripForm({ initial, onSave, onClose }) {
             autoFocus
           />
         </Field>
-        <Field label="Destination (optional)">
-          <input className={inputCls} value={f.destination} onChange={set('destination')} placeholder="e.g. Lisbon" />
-        </Field>
+        <div className="grid grid-cols-[1fr_6.5rem] gap-3">
+          <Field label="Destination (optional)">
+            <input className={inputCls} value={f.destination} onChange={set('destination')} placeholder="e.g. Lisbon" />
+          </Field>
+          <Field label="Currency">
+            <input
+              className={`${inputCls} uppercase`}
+              value={f.currency}
+              onChange={set('currency')}
+              placeholder="EUR"
+              maxLength={3}
+              autoCapitalize="characters"
+            />
+          </Field>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Start date">
             <PickerInput value={f.startDate} onChange={set('startDate')} />

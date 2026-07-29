@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import ShareReceive from './components/ShareReceive'
 import { ToastProvider } from './components/ui'
 import { StoreProvider } from './lib/store'
 import Home from './pages/Home'
@@ -26,11 +27,13 @@ function useHashRoute() {
 export default function App() {
   const [route, navigate] = useHashRoute()
   const tripMatch = route.match(/^\/trip\/(.+)$/)
+  const shareMatch = route.match(/^\/share\/(.+)$/)
 
   return (
     <StoreProvider>
       <ToastProvider>
         {tripMatch ? <TripView id={tripMatch[1]} navigate={navigate} /> : <Home navigate={navigate} />}
+        {shareMatch && <ShareReceive payload={shareMatch[1]} navigate={navigate} />}
       </ToastProvider>
     </StoreProvider>
   )

@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { catById, mapsProvider, titleFor } from '../lib/categories'
+import { fmtMoney } from '../lib/money'
 import {
   IconApple,
   IconCheckCircle,
@@ -31,7 +32,7 @@ const MAPS_META = {
   other: { icon: IconMapPin, label: 'Open map' },
 }
 
-function Card({ item, onEdit, onSetStatus, ghost, overlay, dragRef, dragStyle, handleRef, handleProps }) {
+function Card({ item, currency, onEdit, onSetStatus, ghost, overlay, dragRef, dragStyle, handleRef, handleProps }) {
   const cat = catById(item.type)
   const title = titleFor(item)
   const status = STATUS_UI[item.status] ?? STATUS_UI.planned
@@ -105,6 +106,11 @@ function Card({ item, onEdit, onSetStatus, ghost, overlay, dragRef, dragStyle, h
                 {metaText}
               </span>
             )}
+            {Number.isFinite(item.cost) && (
+              <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">
+                {fmtMoney(item.cost, currency)}
+              </span>
+            )}
           </div>
           {item.notes && (
             <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-sm text-slate-500 dark:text-slate-400">
@@ -130,12 +136,13 @@ function Card({ item, onEdit, onSetStatus, ghost, overlay, dragRef, dragStyle, h
   )
 }
 
-export default function ItemCard({ item, onEdit, onSetStatus }) {
+export default function ItemCard({ item, currency, onEdit, onSetStatus }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id })
   return (
     <Card
       item={item}
+      currency={currency}
       onEdit={onEdit}
       onSetStatus={onSetStatus}
       ghost={isDragging}

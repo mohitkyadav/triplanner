@@ -1,12 +1,15 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { fmtDate } from '../lib/dates'
+import { dayCost, fmtMoney } from '../lib/money'
+import { dayRouteUrl } from '../lib/route'
 import { useStore } from '../lib/store'
 import ItemCard from './ItemCard'
-import { IconBed, IconPencil, IconPlus, IconTrash, iconBtn } from './ui'
+import { IconBed, IconPencil, IconPlus, IconRoute, IconTrash, iconBtn, useToast } from './ui'
 
 export default function DayCard({ trip, day, index, stays = [], isPast, isToday, onEditDay, onAddItem, onEditItem }) {
   const { dispatch } = useStore()
+  const toast = useToast()
   // Makes the whole day a drop target so items can be dragged into empty days.
   const { setNodeRef, isOver } = useDroppable({ id: day.id })
 
@@ -15,11 +18,15 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
   }
 
   function deleteDay() {
-    const label = `Day ${index + 1}`
-    if (day.items.length === 0 || window.confirm(`Delete ${label} and its ${day.items.length} plans?`)) {
-      dispatch({ type: 'day/delete', tripId: trip.id, dayId: day.id })
-    }
+    dispatch({ type: 'day/delete', tripId: trip.id, dayId: day.id })
+    toast(`Day ${index + 1} deleted`, {
+      label: 'Undo',
+      onClick: () => dispatch({ type: 'day/add', tripId: trip.id, day }),
+    })
   }
+
+  const cost = dayCost(day)
+  const routeUrl = dayRouteUrl(trip, day)
 
   return (
     <section
@@ -40,6 +47,23 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
           <span className="min-w-0 truncate text-sm text-slate-400 dark:text-slate-500">· {day.title}</span>
         )}
         <span className="flex-1" />
+        {cost > 0 && (
+          <span className="text-xs font-semibold tabular-nums text-slate-400 dark:text-slate-500">
+            {fmtMoney(cost, trip.currency)}
+          </span>
+        )}
+        {routeUrl && (
+          <a
+            className={iconBtn}
+            href={routeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open the day route in Google Maps"
+            title="Day route in Google Maps"
+          >
+            <IconRoute className="size-4" />
+          </a>
+        )}
         <button className={iconBtn} onClick={onEditDay} aria-label="Edit day">
           <IconPencil className="size-4" />
         </button>
@@ -71,6 +95,7 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
                 <ItemCard
                   key={item.id}
                   item={item}
+                  currency={trip.currency}
                   onEdit={() => onEditItem(item)}
                   onSetStatus={status => setItemStatus(item.id, status)}
                 />

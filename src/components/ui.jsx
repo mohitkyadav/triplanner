@@ -161,6 +161,59 @@ export const IconApple = p => (
     <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.03 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.56-1.702" />
   </Svg>
 )
+export const IconShare = p => (
+  <Svg {...p}>
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
+  </Svg>
+)
+export const IconRoute = p => (
+  <Svg {...p}>
+    <circle cx="6" cy="19" r="3" />
+    <circle cx="18" cy="5" r="3" />
+    <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+  </Svg>
+)
+export const IconQrCode = p => (
+  <Svg {...p}>
+    <rect x="3" y="3" width="5" height="5" rx="1" />
+    <rect x="16" y="3" width="5" height="5" rx="1" />
+    <rect x="3" y="16" width="5" height="5" rx="1" />
+    <path d="M21 16h-3a2 2 0 0 0-2 2v3M21 21v.01M12 7v3a2 2 0 0 1-2 2H7M3 12h.01M12 3h.01M12 16v.01M16 12h1M21 12v.01M12 21v-1" />
+  </Svg>
+)
+export const IconCalendarPlus = p => (
+  <Svg {...p}>
+    <path d="M8 2v4M16 2v4" />
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <path d="M3 10h18M12 14v6M9 17h6" />
+  </Svg>
+)
+export const IconDots = p => (
+  <Svg {...p} stroke="none" fill="currentColor">
+    <circle cx="12" cy="5" r="1.6" />
+    <circle cx="12" cy="12" r="1.6" />
+    <circle cx="12" cy="19" r="1.6" />
+  </Svg>
+)
+export const IconChevronDown = p => (
+  <Svg {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </Svg>
+)
+export const IconCopy = p => (
+  <Svg {...p}>
+    <rect x="8" y="8" width="14" height="14" rx="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </Svg>
+)
+export const IconCheck = p => (
+  <Svg {...p}>
+    <path d="M20 6 9 17l-5-5" />
+  </Svg>
+)
 
 /* ---------- shared class strings ---------- */
 
@@ -296,24 +349,83 @@ export function Modal({ title, onClose, children }) {
   )
 }
 
+/* ---------- dropdown menu ---------- */
+
+export function Menu({ items, label = 'More options' }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const onKey = e => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open])
+  return (
+    <div className="relative">
+      <button className={iconBtn} onClick={() => setOpen(o => !o)} aria-label={label} aria-expanded={open}>
+        <IconDots className="size-4.5" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-50 mt-1 w-60 overflow-hidden rounded-xl bg-white py-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            {items.map(item => (
+              <button
+                key={item.label}
+                onClick={() => {
+                  setOpen(false)
+                  item.onClick()
+                }}
+                className={`flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm font-medium transition ${
+                  item.danger
+                    ? 'text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10'
+                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                }`}
+              >
+                <item.icon className="size-4 shrink-0" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 /* ---------- toast ---------- */
 
 const ToastCtx = createContext(() => {})
 
+// toast('Saved') or toast('Deleted', { label: 'Undo', onClick }) — toasts with
+// an action stay up longer so there is time to tap it.
 export function ToastProvider({ children }) {
-  const [msg, setMsg] = useState(null)
+  const [msg, setMsg] = useState(null) // { text, action? }
   const timer = useRef()
-  const toast = useCallback(m => {
-    setMsg(m)
+  const toast = useCallback((text, action) => {
+    setMsg({ text, action })
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => setMsg(null), 2600)
+    timer.current = setTimeout(() => setMsg(null), action ? 6000 : 2600)
   }, [])
   return (
     <ToastCtx.Provider value={toast}>
       {children}
       {msg && (
-        <div className="anim-toast fixed bottom-6 left-1/2 z-60 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900">
-          {msg}
+        <div className="anim-toast fixed bottom-6 left-1/2 z-60 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-slate-900 py-2 pl-4 pr-2 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900">
+          {msg.text}
+          {msg.action ? (
+            <button
+              onClick={() => {
+                clearTimeout(timer.current)
+                setMsg(null)
+                msg.action.onClick()
+              }}
+              className="rounded-full px-2.5 py-0.5 font-bold text-accent transition hover:bg-white/10 dark:text-brand-600 dark:hover:bg-slate-900/5"
+            >
+              {msg.action.label}
+            </button>
+          ) : (
+            <span className="pr-2" />
+          )}
         </div>
       )}
     </ToastCtx.Provider>

@@ -14,22 +14,29 @@ import DayCard from '../components/DayCard'
 import DayForm from '../components/DayForm'
 import { ItemCardOverlay } from '../components/ItemCard'
 import ItemForm from '../components/ItemForm'
+import PackingList from '../components/PackingList'
+import ShareModal from '../components/ShareModal'
 import TripForm from '../components/TripForm'
 import {
   IconArrowLeft,
   IconCalendar,
+  IconCalendarPlus,
   IconDownload,
   IconMapPin,
   IconPencil,
   IconPlaneLanding,
   IconPlaneTakeoff,
   IconPlus,
+  IconShare,
   IconTrash,
+  Menu,
   iconBtn,
   useToast,
 } from '../components/ui'
 import { addDaysISO, fmtDate, fmtRange, todayISO } from '../lib/dates'
-import { downloadJSON, exportPayload, slug } from '../lib/io'
+import { tripToICS } from '../lib/ics'
+import { downloadFile, downloadJSON, exportPayload, slug } from '../lib/io'
+import { fmtMoney, tripCost } from '../lib/money'
 import { makeDay, uid, useStore } from '../lib/store'
 import { computeStays } from '../lib/stays'
 
@@ -73,6 +80,7 @@ export default function TripView({ id, navigate }) {
   const [itemModal, setItemModal] = useState(null) // { dayId, item? }
   const [dayModal, setDayModal] = useState(null) // { day, index }
   const [editTrip, setEditTrip] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [activeItem, setActiveItem] = useState(null) // item being dragged (for the overlay)
   const dragSnapshot = useRef(null) // days before the drag, restored on cancel
 
@@ -109,14 +117,23 @@ export default function TripView({ id, navigate }) {
   }
 
   function deleteTrip() {
-    if (window.confirm(`Delete the trip “${trip.name}”? This cannot be undone.`)) {
-      dispatch({ type: 'trip/delete', id: trip.id })
-    }
+    if (!window.confirm(`Delete the trip “${trip.name}”?`)) return
+    const index = state.trips.findIndex(t => t.id === trip.id)
+    dispatch({ type: 'trip/delete', id: trip.id })
+    toast('Trip deleted', {
+      label: 'Undo',
+      onClick: () => dispatch({ type: 'trip/restore', trip, index }),
+    })
   }
 
   function exportTrip() {
     downloadJSON(`${slug(trip.name)}.json`, exportPayload([trip]))
     toast('Trip exported')
+  }
+
+  function exportCalendar() {
+    downloadFile(`${slug(trip.name)}.ics`, tripToICS(trip), 'text/calendar')
+    toast('Calendar file exported')
   }
 
   function saveItem(data) {
@@ -129,13 +146,20 @@ export default function TripView({ id, navigate }) {
   }
 
   function deleteItem() {
-    dispatch({ type: 'item/delete', tripId: trip.id, dayId: itemModal.dayId, itemId: itemModal.item.id })
+    const { dayId, item } = itemModal
+    const index = trip.days.find(d => d.id === dayId)?.items.findIndex(i => i.id === item.id)
+    dispatch({ type: 'item/delete', tripId: trip.id, dayId, itemId: item.id })
     setItemModal(null)
+    toast('Plan deleted', {
+      label: 'Undo',
+      onClick: () => dispatch({ type: 'item/add', tripId: trip.id, dayId, item, index }),
+    })
   }
 
   const modalDayIndex = itemModal ? trip.days.findIndex(d => d.id === itemModal.dayId) : -1
   const staysByDay = computeStays(trip)
   const { arrival, departure } = flightEndpoints(trip)
+  const totalCost = tripCost(trip)
   const today = todayISO()
 
   const dayOfItem = itemId => trip.days.find(d => d.items.some(i => i.id === itemId))
@@ -189,15 +213,20 @@ export default function TripView({ id, navigate }) {
             <IconArrowLeft />
           </button>
           <h1 className="min-w-0 flex-1 truncate px-1 font-semibold">{trip.name}</h1>
+          <button className={iconBtn} onClick={() => setSharing(true)} aria-label="Share trip">
+            <IconShare className="size-4.5" />
+          </button>
           <button className={iconBtn} onClick={() => setEditTrip(true)} aria-label="Edit trip">
             <IconPencil className="size-4.5" />
           </button>
-          <button className={iconBtn} onClick={exportTrip} aria-label="Export trip">
-            <IconDownload className="size-4.5" />
-          </button>
-          <button className={iconBtn} onClick={deleteTrip} aria-label="Delete trip">
-            <IconTrash className="size-4.5" />
-          </button>
+          <Menu
+            label="More trip actions"
+            items={[
+              { label: 'Add to calendar (.ics)', icon: IconCalendarPlus, onClick: exportCalendar },
+              { label: 'Export as JSON', icon: IconDownload, onClick: exportTrip },
+              { label: 'Delete trip', icon: IconTrash, onClick: deleteTrip, danger: true },
+            ]}
+          />
         </div>
       </header>
 
@@ -213,7 +242,12 @@ export default function TripView({ id, navigate }) {
             )}
             <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
               <IconCalendar className="size-4 shrink-0" />
-              {[fmtRange(trip.startDate, trip.endDate), `${trip.days.length} day${trip.days.length === 1 ? '' : 's'}`, `${stops} stop${stops === 1 ? '' : 's'}`]
+              {[
+                fmtRange(trip.startDate, trip.endDate),
+                `${trip.days.length} day${trip.days.length === 1 ? '' : 's'}`,
+                `${stops} stop${stops === 1 ? '' : 's'}`,
+                totalCost > 0 && fmtMoney(totalCost, trip.currency),
+              ]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
@@ -227,6 +261,8 @@ export default function TripView({ id, navigate }) {
             </div>
           )}
         </div>
+
+        <PackingList trip={trip} />
 
         <DndContext
           sensors={sensors}
@@ -267,11 +303,13 @@ export default function TripView({ id, navigate }) {
         <ItemForm
           initial={itemModal.item}
           dayLabel={`day ${modalDayIndex + 1}`}
+          currency={trip.currency}
           onSave={saveItem}
           onDelete={deleteItem}
           onClose={() => setItemModal(null)}
         />
       )}
+      {sharing && <ShareModal trip={trip} onClose={() => setSharing(false)} />}
       {dayModal && (
         <DayForm
           day={dayModal.day}
