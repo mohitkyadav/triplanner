@@ -15,11 +15,16 @@ device — nothing ever leaves it — and can be exported and imported as JSON.
   the header (➤ icon). A plan keeps a start time and nothing more — the app
   never guesses how long a plan runs, so the plan you are on is simply the one
   that started last.
-- **14 place types** — restaurant, museum, park, landmark, café, nightlife,
-  beach, shopping, activity, work and more, each with notes ("what to eat
-  here…"), an optional time, and a maps link.
-- **Maps links** — paste a Google or Apple Maps link and the card shows the
-  matching provider icon.
+- **15 plan types** — flight, train, bus, hotel, restaurant, museum, park,
+  landmark, café, nightlife, beach, shopping, activity, work and other, each
+  with notes ("what to eat here…"), an optional time and an optional cost.
+- **Every plan reaches the map, with no link to paste.** The `place` field takes
+  any text. A Google or Apple Maps link gives one labelled button that opens
+  that exact place. Any other text — an address, a different name — gives two
+  buttons, so you pick the provider. Leave it empty and the buttons search for
+  the plan name plus the trip destination. The shape tells you which one you
+  are looking at: one labelled button means an exact place, two icons mean a
+  search.
 - **Airline names & logos** — type a flight number ("LH 1178") and the app
   derives the airline: the name comes from a bundled offline dataset, the
   logo from a keyless CDN (see below). Shown on flight cards, the trip banner
@@ -145,9 +150,9 @@ Exports look like:
           "date": "2026-08-01",
           "title": "",
           "items": [
-            { "id": "…", "type": "flight", "flightNo": "LH 1178", "direction": "arrival", "location": "Lisbon LIS", "time": "10:35", "title": "", "mapsUrl": "", "notes": "", "cost": 120 },
-            { "id": "…", "type": "hotel", "hotelAction": "check-in", "title": "Hotel Alfama", "time": "15:00", "mapsUrl": "", "notes": "", "cost": 240 },
-            { "id": "…", "type": "restaurant", "title": "Cervejaria Ramiro", "time": "13:00", "mapsUrl": "", "notes": "Garlic prawns, tiger shrimp" }
+            { "id": "…", "type": "flight", "flightNo": "LH 1178", "direction": "arrival", "location": "Lisbon LIS", "time": "10:35", "title": "", "place": "", "notes": "", "cost": 120 },
+            { "id": "…", "type": "hotel", "hotelAction": "check-in", "title": "Hotel Alfama", "time": "15:00", "place": "", "notes": "", "cost": 240 },
+            { "id": "…", "type": "restaurant", "title": "Cervejaria Ramiro", "time": "13:00", "place": "https://maps.app.goo.gl/…", "notes": "Garlic prawns, tiger shrimp" }
           ]
         }
       ],
@@ -159,7 +164,17 @@ Exports look like:
 ```
 
 `cost` (number) and `currency` (ISO 4217 code) are optional; `packing` is the
-trip's checklist.
+trip's checklist. `place` takes any text — a Maps link, an address or a name —
+and an empty one falls back to the plan name plus the destination.
+
+Two field moves are applied to older data, once, when it loads
+(`migrate` in `src/lib/store.jsx`) and again on import (`src/lib/io.js`), so old
+backups and old share links keep working:
+
+| Older | Now |
+|---|---|
+| `mapsUrl` (a link only) | `place` (any text) |
+| `type: "transport"` | `type: "train"` (with `"bus"` as the new sibling) |
 
 Storage: `localStorage` key `triplanner:v1`, mirrored to the `snapshot` record
 of the `kv` store in the `triplanner` IndexedDB database (see

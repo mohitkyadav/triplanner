@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import { readMirror, requestPersistence, scheduleBackup } from './backup'
+import { RENAMED_TYPES } from './categories'
 import { addDaysISO, daysBetween } from './dates'
 import { normalizeTrips } from './io'
 import { uid } from './uid'
@@ -7,6 +8,21 @@ import { uid } from './uid'
 const KEY = 'triplanner:v1'
 
 export { uid }
+
+/* Moves for plans an older version wrote, applied once when the data loads:
+     `mapsUrl` took a link only — `place` takes any text.
+     the single `transport` type became `train` and `bus`. */
+const migrateItem = ({ mapsUrl, ...item }) => ({
+  ...item,
+  ...(!item.place && mapsUrl ? { place: mapsUrl } : null),
+  ...(RENAMED_TYPES[item.type] ? { type: RENAMED_TYPES[item.type] } : null),
+})
+
+const migrate = trips =>
+  trips.map(trip => ({
+    ...trip,
+    days: (trip.days ?? []).map(day => ({ ...day, items: (day.items ?? []).map(migrateItem) })),
+  }))
 
 // True when localStorage held nothing readable — the browser cleared it, the
 // value was damaged, or this is a first visit. Only then may the app restore
@@ -19,7 +35,7 @@ function load() {
     const raw = localStorage.getItem(KEY)
     if (raw !== null) {
       const data = JSON.parse(raw)
-      if (data && Array.isArray(data.trips)) return { trips: data.trips }
+      if (data && Array.isArray(data.trips)) return { trips: migrate(data.trips) }
     }
   } catch {
     // corrupted storage — start fresh rather than crash

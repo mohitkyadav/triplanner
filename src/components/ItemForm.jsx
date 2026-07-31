@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { airlineFromFlightNo } from '../lib/airlines'
 import { CATEGORIES } from '../lib/categories'
+import { placeLinks } from '../lib/maps'
 import AirlineLogo from './AirlineLogo'
 import {
   btnDanger,
@@ -28,7 +29,7 @@ const NOTE_HINTS = {
   work: 'Meetings, calls, focus blocks…',
 }
 
-export default function ItemForm({ initial, dayLabel, currency, onSave, onDelete, onClose }) {
+export default function ItemForm({ initial, dayLabel, trip, onSave, onDelete, onClose }) {
   const editing = Boolean(initial?.id)
   const [type, setType] = useState(initial?.type ?? 'landmark')
   const [status, setStatus] = useState(initial?.status ?? 'planned')
@@ -36,7 +37,7 @@ export default function ItemForm({ initial, dayLabel, currency, onSave, onDelete
     title: initial?.title ?? '',
     time: initial?.time ?? '',
     cost: initial?.cost != null ? String(initial.cost) : '',
-    mapsUrl: initial?.mapsUrl ?? '',
+    place: initial?.place ?? '',
     notes: initial?.notes ?? '',
     flightNo: initial?.flightNo ?? '',
     direction: initial?.direction ?? 'arrival',
@@ -53,7 +54,8 @@ export default function ItemForm({ initial, dayLabel, currency, onSave, onDelete
       title: f.title.trim(),
       time: f.time,
       cost: Number.isFinite(cost) && cost > 0 ? Math.round(cost * 100) / 100 : undefined,
-      mapsUrl: f.mapsUrl.trim(),
+      place: f.place.trim(),
+      mapsUrl: undefined, // the old link-only field, dropped on the next save
       notes: f.notes.trim(),
       status: status === 'planned' ? undefined : status,
     }
@@ -71,7 +73,10 @@ export default function ItemForm({ initial, dayLabel, currency, onSave, onDelete
   const titlePlaceholder =
     type === 'flight' ? 'e.g. Berlin → Lisbon' : type === 'hotel' ? 'e.g. Hotel Alfama' : 'e.g. Louvre Museum'
   const airline = type === 'flight' ? airlineFromFlightNo(f.flightNo) : null
-  const costLabel = currency ? `Cost (${currency})` : 'Cost (optional)'
+  const costLabel = trip?.currency ? `Cost (${trip.currency})` : 'Cost (optional)'
+  // What the map buttons will do, shown live under the field.
+  const mapHint =
+    placeLinks(trip, { type, title: f.title, location: f.location, place: f.place }) ?? {}
   const costInput = (
     <input
       className={inputCls}
@@ -174,15 +179,21 @@ export default function ItemForm({ initial, dayLabel, currency, onSave, onDelete
           </div>
         )}
 
-        <Field label="Maps link (optional)">
+        <Field label="Map (optional)">
           <input
-            type="url"
             className={inputCls}
-            value={f.mapsUrl}
-            onChange={set('mapsUrl')}
-            placeholder="Paste a Google / Apple Maps link"
+            value={f.place}
+            onChange={set('place')}
+            placeholder="Address, place name, or a Maps link"
           />
         </Field>
+        <p className="-mt-2.5 text-[13px] text-slate-400 dark:text-slate-500">
+          {mapHint.kind === 'link'
+            ? 'A Maps link opens that exact place.'
+            : mapHint.query
+              ? `Opens a search for “${mapHint.query}”.`
+              : 'Add a name above and the map buttons search for it.'}
+        </p>
 
         <Field label="Notes (optional)">
           <textarea

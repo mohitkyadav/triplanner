@@ -1,18 +1,16 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { airlineFromFlightNo } from '../lib/airlines'
-import { catById, mapsProvider, titleFor } from '../lib/categories'
+import { catById, titleFor } from '../lib/categories'
 import { fmtMoney } from '../lib/money'
 import AirlineLogo from './AirlineLogo'
+import MapLinks from './MapLinks'
 import {
-  IconApple,
   IconCheckCircle,
   IconCircle,
-  IconGoogle,
   IconGrip,
   IconLogIn,
   IconLogOut,
-  IconMapPin,
   IconPlaneLanding,
   IconPlaneTakeoff,
   IconXCircle,
@@ -28,18 +26,11 @@ const STATUS_UI = {
     label: 'Planned — tap to mark done',
   },
 }
-const MAPS_META = {
-  google: { icon: IconGoogle, label: 'Google Maps' },
-  apple: { icon: IconApple, label: 'Apple Maps' },
-  other: { icon: IconMapPin, label: 'Open map' },
-}
-
-function Card({ item, currency, onEdit, onSetStatus, ghost, overlay, dragRef, dragStyle, handleRef, handleProps }) {
+function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragStyle, handleRef, handleProps }) {
   const cat = catById(item.type)
   const title = titleFor(item)
   const status = STATUS_UI[item.status] ?? STATUS_UI.planned
   const skipped = item.status === 'skipped'
-  const maps = item.mapsUrl ? MAPS_META[mapsProvider(item.mapsUrl)] : null
 
   const airline = item.type === 'flight' ? airlineFromFlightNo(item.flightNo) : null
   const emojiBadge = (
@@ -118,27 +109,15 @@ function Card({ item, currency, onEdit, onSetStatus, ghost, overlay, dragRef, dr
             )}
             {Number.isFinite(item.cost) && (
               <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">
-                {fmtMoney(item.cost, currency)}
+                {fmtMoney(item.cost, trip?.currency)}
               </span>
             )}
+            <MapLinks trip={trip} item={item} />
           </div>
           {item.notes && (
             <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-sm text-slate-500 dark:text-slate-400">
               {item.notes}
             </p>
-          )}
-          {maps && (
-            <div className="mt-1.5" onClick={e => e.stopPropagation()}>
-              <a
-                href={item.mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:underline dark:text-brand-300"
-              >
-                <maps.icon className="size-3.5" />
-                {maps.label}
-              </a>
-            </div>
           )}
         </div>
       </div>
@@ -146,13 +125,13 @@ function Card({ item, currency, onEdit, onSetStatus, ghost, overlay, dragRef, dr
   )
 }
 
-export default function ItemCard({ item, currency, onEdit, onSetStatus }) {
+export default function ItemCard({ trip, item, onEdit, onSetStatus }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id })
   return (
     <Card
+      trip={trip}
       item={item}
-      currency={currency}
       onEdit={onEdit}
       onSetStatus={onSetStatus}
       ghost={isDragging}
@@ -165,10 +144,10 @@ export default function ItemCard({ item, currency, onEdit, onSetStatus }) {
 }
 
 // Rendered inside <DragOverlay> — same card, no sortable wiring.
-export function ItemCardOverlay({ item }) {
+export function ItemCardOverlay({ trip, item }) {
   return (
     <ul className="list-none">
-      <Card item={item} overlay />
+      <Card trip={trip} item={item} overlay />
     </ul>
   )
 }

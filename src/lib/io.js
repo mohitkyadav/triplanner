@@ -1,3 +1,4 @@
+import { RENAMED_TYPES } from './categories'
 import { uid } from './uid'
 
 export function downloadFile(filename, content, type) {
@@ -30,21 +31,23 @@ const str = v => (typeof v === 'string' ? v : '')
 
 function normalizeItem(i) {
   if (!i || typeof i !== 'object') throw new Error('invalid item')
+  const type = str(i.type) || 'other'
   return {
     id: typeof i.id === 'string' ? i.id : uid(),
-    type: str(i.type) || 'other',
+    type: RENAMED_TYPES[type] ?? type,
     title: str(i.title),
     time: str(i.time),
-    mapsUrl: str(i.mapsUrl),
+    // `mapsUrl` held a link only; `place` takes any text.
+    place: str(i.place) || str(i.mapsUrl),
     notes: str(i.notes),
     ...(Number.isFinite(+i.cost) && +i.cost > 0 && { cost: Math.round(+i.cost * 100) / 100 }),
     ...(['done', 'skipped'].includes(i.status) && { status: i.status }),
-    ...(i.type === 'flight' && {
+    ...(type === 'flight' && {
       flightNo: str(i.flightNo),
       direction: i.direction === 'departure' ? 'departure' : 'arrival',
       location: str(i.location),
     }),
-    ...(i.type === 'hotel' && {
+    ...(type === 'hotel' && {
       hotelAction: i.hotelAction === 'check-out' ? 'check-out' : 'check-in',
     }),
   }

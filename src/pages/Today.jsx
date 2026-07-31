@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import AirlineLogo from '../components/AirlineLogo'
 import ItemForm from '../components/ItemForm'
+import MapLinks from '../components/MapLinks'
 import {
   btnChip,
   btnChipBrand,
@@ -12,7 +13,6 @@ import {
   IconChevronRight,
   IconCircle,
   IconHourglass,
-  IconMapPin,
   IconNavigation,
   IconPencil,
   IconPlus,
@@ -24,8 +24,8 @@ import {
 import { airlineFromFlightNo } from '../lib/airlines'
 import { catById, titleFor } from '../lib/categories'
 import { fmtDate } from '../lib/dates'
+import { dayRouteUrl, pairRouteUrl } from '../lib/maps'
 import { dayCost, fmtMoney } from '../lib/money'
-import { dayRouteUrl, pairRouteUrl, placeMapsUrl } from '../lib/route'
 import { dayPlan, fmtClock, fmtDuration, gapBetween, useClock } from '../lib/schedule'
 import { uid, useStore } from '../lib/store'
 
@@ -72,7 +72,6 @@ const timeLabel = entry => (entry.start == null ? 'Any time' : fmtClock(entry.st
 function HeroCard({ trip, entry, label, running, onEdit, onStatus }) {
   const { item } = entry
   const cat = catById(item.type)
-  const mapsUrl = placeMapsUrl(trip, item)
 
   return (
     <section
@@ -126,12 +125,7 @@ function HeroCard({ trip, entry, label, running, onEdit, onStatus }) {
           Skip
         </button>
         <span className="flex-1" />
-        {mapsUrl && (
-          <a className={btnChip} href={mapsUrl} target="_blank" rel="noopener noreferrer">
-            <IconMapPin className="size-4" />
-            Map
-          </a>
-        )}
+        <MapLinks trip={trip} item={item} hero />
       </div>
     </section>
   )
@@ -464,7 +458,7 @@ export default function Today({ id, navigate }) {
         <ItemForm
           initial={itemModal.item}
           dayLabel={`day ${dayIndex + 1}`}
-          currency={trip.currency}
+          trip={trip}
           onSave={saveItem}
           onDelete={deleteItem}
           onClose={() => setItemModal(null)}

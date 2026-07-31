@@ -325,7 +325,7 @@ export default function TripView({ id, navigate }) {
               onEditItem={item => setItemModal({ dayId: day.id, item })}
             />
           ))}
-          <DragOverlay>{activeItem ? <ItemCardOverlay item={activeItem} /> : null}</DragOverlay>
+          <DragOverlay>{activeItem ? <ItemCardOverlay trip={trip} item={activeItem} /> : null}</DragOverlay>
         </DndContext>
 
         <button
@@ -342,7 +342,7 @@ export default function TripView({ id, navigate }) {
         <ItemForm
           initial={itemModal.item}
           dayLabel={`day ${modalDayIndex + 1}`}
-          currency={trip.currency}
+          trip={trip}
           onSave={saveItem}
           onDelete={deleteItem}
           onClose={() => setItemModal(null)}

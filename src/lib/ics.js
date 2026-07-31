@@ -1,5 +1,6 @@
 import { catById, titleFor } from './categories'
 import { addDaysISO } from './dates'
+import { placeUrl } from './maps'
 import { fmtClock, toMinutes } from './schedule'
 
 // iCalendar (RFC 5545) export. A plan keeps no length, but a calendar event
@@ -78,7 +79,8 @@ export function tripToICS(trip) {
           ['SUMMARY', esc(`${catById(item.type).emoji} ${titleFor(item)}`)],
           ['LOCATION', esc(item.location || (item.type !== 'flight' && item.title) || '')],
           ['DESCRIPTION', item.notes && esc(item.notes)],
-          ['URL', item.mapsUrl && esc(item.mapsUrl)],
+          // `place` can hold plain text, but URL: must be a real URL.
+          ['URL', esc(placeUrl(trip, item) || '')],
         ]),
       )
     }

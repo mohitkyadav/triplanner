@@ -1,8 +1,8 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { fmtDate } from '../lib/dates'
+import { dayRouteUrl } from '../lib/maps'
 import { dayCost, fmtMoney } from '../lib/money'
-import { dayRouteUrl } from '../lib/route'
 import { useStore } from '../lib/store'
 import ItemCard from './ItemCard'
 import { IconBed, IconPencil, IconPlus, IconRoute, IconTrash, iconBtn, useToast } from './ui'
@@ -94,8 +94,8 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
               {day.items.map(item => (
                 <ItemCard
                   key={item.id}
+                  trip={trip}
                   item={item}
-                  currency={trip.currency}
                   onEdit={() => onEditItem(item)}
                   onSetStatus={status => setItemStatus(item.id, status)}
                 />
