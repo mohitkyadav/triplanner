@@ -61,7 +61,7 @@ export default function BookingImport({ trip, text, onImport, onClose }) {
 
   if (parsed.error) {
     return (
-      <Modal title="Add a booking" onClose={onClose}>
+      <Modal title="Import booking" onClose={onClose}>
         <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
           This file could not be read — {parsed.error}.
         </p>
@@ -73,7 +73,7 @@ export default function BookingImport({ trip, text, onImport, onClose }) {
   }
 
   return (
-    <Modal title={`Add a booking · ${rows.length} event${rows.length === 1 ? '' : 's'}`} onClose={onClose}>
+    <Modal title={`Import booking · ${rows.length} event${rows.length === 1 ? '' : 's'}`} onClose={onClose}>
       <div className="space-y-4 pb-1">
         <ul className="space-y-2">
           {rows.map(row => {

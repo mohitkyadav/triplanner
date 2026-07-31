@@ -8,7 +8,7 @@ device; nothing is uploaded.
 - **Trips → days → plans** — days come from the date range; 15 plan types.
 - **Trip mode** — during the trip: the plan you are on, what comes next, how
   long until then, directions for the hop, one tap to mark it done.
-- **Add a booking** — feed it the `.ics` from a flight, hotel or rail
+- **Import booking** — feed it the `.ics` from a flight, hotel or rail
   confirmation and it fills the days. Preview first, one Undo after.
 - **Maps with no link to paste** — `place` takes any text: a Maps link opens
   that exact place, anything else gives a Google and an Apple search button.

@@ -302,8 +302,8 @@ export default function TripView({ id, navigate }) {
           <Menu
             label="More trip actions"
             items={[
-              { label: 'Add a booking (.ics)', icon: IconTicket, onClick: () => icsRef.current?.click() },
-              { label: 'Add to calendar (.ics)', icon: IconCalendarPlus, onClick: exportCalendar },
+              { label: 'Import booking (.ics)', icon: IconTicket, onClick: () => icsRef.current?.click() },
+              { label: 'Export to calendar (.ics)', icon: IconCalendarPlus, onClick: exportCalendar },
               { label: 'Export as JSON', icon: IconDownload, onClick: exportTrip },
               { label: 'Delete trip', icon: IconTrash, onClick: deleteTrip, danger: true },
             ]}
