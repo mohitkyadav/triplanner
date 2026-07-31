@@ -11,6 +11,7 @@ import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useEffect, useRef, useState } from 'react'
 import AirlineLogo from '../components/AirlineLogo'
+import BookingImport from '../components/BookingImport'
 import DayCard from '../components/DayCard'
 import DayForm from '../components/DayForm'
 import { ItemCardOverlay } from '../components/ItemCard'
@@ -31,6 +32,7 @@ import {
   IconPlaneTakeoff,
   IconPlus,
   IconShare,
+  IconTicket,
   IconTrash,
   Menu,
   iconBtn,
@@ -41,8 +43,16 @@ import { addDaysISO, fmtDate, fmtRange, todayISO } from '../lib/dates'
 import { tripToICS } from '../lib/ics'
 import { downloadFile, downloadJSON, exportPayload, slug } from '../lib/io'
 import { fmtMoney, tripCost } from '../lib/money'
-import { makeDay, uid, useStore } from '../lib/store'
+import { makeDay, sortDays, uid, useStore } from '../lib/store'
 import { computeStays } from '../lib/stays'
+
+// Keeps a day readable: a timed plan lands among the other timed plans, and a
+// plan with no time goes to the end.
+function insertByTime(items, item) {
+  if (!item.time) return [...items, item]
+  const at = items.findIndex(i => !i.time || i.time > item.time)
+  return at < 0 ? [...items, item] : [...items.slice(0, at), item, ...items.slice(at)]
+}
 
 // First arrival flight and last departure flight of the trip, for the banner.
 function flightEndpoints(trip) {
@@ -93,8 +103,10 @@ export default function TripView({ id, navigate }) {
   const [dayModal, setDayModal] = useState(null) // { day, index }
   const [editTrip, setEditTrip] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [booking, setBooking] = useState(null) // contents of a chosen .ics file
   const [activeItem, setActiveItem] = useState(null) // item being dragged (for the overlay)
   const dragSnapshot = useRef(null) // days before the drag, restored on cancel
+  const icsRef = useRef(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -146,6 +158,53 @@ export default function TripView({ id, navigate }) {
   function exportCalendar() {
     downloadFile(`${slug(trip.name)}.ics`, tripToICS(trip), 'text/calendar')
     toast('Calendar file exported')
+  }
+
+  async function readBookingFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      setBooking(await file.text())
+    } catch {
+      toast('That file could not be read')
+    }
+  }
+
+  /* Adds the plans the user ticked in the preview. A booking can fall on a day
+     the trip does not hold yet, so the day is created and the trip dates grow
+     to cover it. One Undo puts everything back. */
+  function addBooking(rows) {
+    const before = { days: trip.days, startDate: trip.startDate, endDate: trip.endDate }
+    let days = trip.days
+    for (const row of rows) {
+      let day = days.find(d => d.date === row.date)
+      if (!day) {
+        day = makeDay(row.date)
+        days = sortDays([...days, day])
+      }
+      days = days.map(d => (d.id === day.id ? { ...d, items: insertByTime(d.items, { id: uid(), ...row.item }) } : d))
+    }
+    const dates = rows.map(r => r.date).filter(Boolean)
+    const span = [trip.startDate, trip.endDate, ...dates].filter(Boolean).sort()
+    const patch = { startDate: span[0], endDate: span[span.length - 1] }
+
+    dispatch({ type: 'trip/setDays', tripId: trip.id, days })
+    if (patch.startDate !== trip.startDate || patch.endDate !== trip.endDate) {
+      dispatch({ type: 'trip/update', id: trip.id, patch })
+    }
+    setBooking(null)
+    toast(`Added ${rows.length} plan${rows.length === 1 ? '' : 's'}`, {
+      label: 'Undo',
+      onClick: () => {
+        dispatch({ type: 'trip/setDays', tripId: trip.id, days: before.days })
+        dispatch({
+          type: 'trip/update',
+          id: trip.id,
+          patch: { startDate: before.startDate, endDate: before.endDate },
+        })
+      },
+    })
   }
 
   function saveItem(data) {
@@ -243,6 +302,7 @@ export default function TripView({ id, navigate }) {
           <Menu
             label="More trip actions"
             items={[
+              { label: 'Add a booking (.ics)', icon: IconTicket, onClick: () => icsRef.current?.click() },
               { label: 'Add to calendar (.ics)', icon: IconCalendarPlus, onClick: exportCalendar },
               { label: 'Export as JSON', icon: IconDownload, onClick: exportTrip },
               { label: 'Delete trip', icon: IconTrash, onClick: deleteTrip, danger: true },
@@ -347,6 +407,16 @@ export default function TripView({ id, navigate }) {
           onDelete={deleteItem}
           onClose={() => setItemModal(null)}
         />
+      )}
+      <input
+        ref={icsRef}
+        type="file"
+        accept=".ics,text/calendar"
+        hidden
+        onChange={readBookingFile}
+      />
+      {booking != null && (
+        <BookingImport trip={trip} text={booking} onImport={addBooking} onClose={() => setBooking(null)} />
       )}
       {sharing && <ShareModal trip={trip} onClose={() => setSharing(false)} />}
       {dayModal && (

@@ -263,6 +263,12 @@ export const IconInstall = p => (
     <path d="M12 7v7M9 11l3 3 3-3" />
   </Svg>
 )
+export const IconTicket = p => (
+  <Svg {...p}>
+    <path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-6z" />
+    <path d="M13 5v14" />
+  </Svg>
+)
 export const IconHourglass = p => (
   <Svg {...p}>
     <path d="M6 2h12M6 22h12" />
