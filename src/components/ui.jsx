@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 /* ---------- icons (24px stroke, lucide-style) ---------- */
@@ -276,6 +276,35 @@ export const IconHourglass = p => (
   </Svg>
 )
 
+export const IconPaperclip = p => (
+  <Svg {...p}>
+    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+  </Svg>
+)
+export const IconWallet = p => (
+  <Svg {...p}>
+    <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+    <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+  </Svg>
+)
+export const IconExternal = p => (
+  <Svg {...p}>
+    <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+  </Svg>
+)
+export const IconRadar = p => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="2" />
+    <path d="M16.24 7.76a6 6 0 0 1 0 8.49M7.76 16.24a6 6 0 0 1 0-8.49M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14" />
+  </Svg>
+)
+export const IconFile = p => (
+  <Svg {...p}>
+    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
+    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+  </Svg>
+)
+
 /* ---------- shared class strings ---------- */
 
 export const btnPrimary =
@@ -360,22 +389,93 @@ export function Segmented({ options, value, onChange }) {
 
 /* ---------- modal (bottom sheet on mobile, dialog on desktop) ---------- */
 
+/* Open dialogs, innermost last. Each holds a ref to its onClose.
+
+   An open dialog owns one history entry, so the phone's Back button closes
+   the dialog instead of leaving the page. Closing a dialog any other way
+   takes that entry back off. A page change made from inside a dialog
+   replaces the entry (see useHashRoute), so it never lingers. */
+const openDialogs = []
+let skipNextPop = false
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    if (skipNextPop) {
+      skipNextPop = false
+      return
+    }
+    const top = openDialogs[openDialogs.length - 1]
+    if (!top) return
+    top.current()
+    // a dialog still open underneath keeps an entry of its own
+    setTimeout(() => {
+      if (openDialogs.length > 0 && !history.state?.dialog) history.pushState({ dialog: true }, '')
+    })
+  })
+}
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 export function Modal({ title, onClose, children }) {
   // Height of the on-screen keyboard overlapping the layout viewport (iOS
   // Safari keeps position:fixed anchored behind the keyboard). Where the
   // browser resizes the layout instead (interactive-widget=resizes-content),
   // this stays 0.
   const [kbInset, setKbInset] = useState(0)
+  const dialogRef = useRef(null)
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  const titleId = useId()
 
+  // Back button + Escape close the innermost dialog only.
   useEffect(() => {
-    const onKey = e => e.key === 'Escape' && onClose()
+    const entry = closeRef
+    openDialogs.push(entry)
+    if (!history.state?.dialog) history.pushState({ dialog: true }, '')
+    const onKey = e => e.key === 'Escape' && openDialogs[openDialogs.length - 1] === entry && entry.current()
     document.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
     return () => {
+      openDialogs.splice(openDialogs.indexOf(entry), 1)
       document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
+      if (openDialogs.length === 0) document.body.style.overflow = ''
+      // Wait a tick: React may mount the dialog again straight away.
+      setTimeout(() => {
+        if (openDialogs.length === 0 && history.state?.dialog) {
+          skipNextPop = true
+          history.back()
+        }
+      })
     }
-  }, [onClose])
+  }, [])
+
+  // Focus moves into the dialog, stays there on Tab, and goes back to where
+  // it was on close.
+  useEffect(() => {
+    const dialog = dialogRef.current
+    const before = document.activeElement
+    if (!dialog.contains(document.activeElement)) dialog.focus()
+    const onKey = e => {
+      if (e.key !== 'Tab' || openDialogs[openDialogs.length - 1] !== closeRef) return
+      const items = [...dialog.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null || el === document.activeElement)
+      if (items.length === 0) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      if (before?.isConnected) before.focus?.({ preventScroll: true })
+    }
+  }, [])
 
   useEffect(() => {
     const vv = window.visualViewport
@@ -397,13 +497,18 @@ export function Modal({ title, onClose, children }) {
     >
       <div className="anim-backdrop absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        className="anim-sheet relative flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-white shadow-xl sm:max-w-lg sm:rounded-2xl dark:bg-slate-900"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="anim-sheet relative flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-white shadow-xl outline-none sm:max-w-lg sm:rounded-2xl dark:bg-slate-900"
         style={kbInset ? { maxHeight: `calc(100dvh - ${kbInset}px - 1.5rem)` } : undefined}
       >
         <div className="flex items-center justify-between px-5 pb-1 pt-4">
-          <h2 className="text-lg font-bold">{title}</h2>
+          <h2 id={titleId} className="text-lg font-bold">
+            {title}
+          </h2>
           <button onClick={onClose} className={iconBtn} aria-label="Close">
             <IconX />
           </button>
@@ -461,37 +566,83 @@ export function Menu({ items, label = 'More options' }) {
 /* ---------- toast ---------- */
 
 const ToastCtx = createContext(() => {})
+const MAX_TOASTS = 3
 
-// toast('Saved') or toast('Deleted', { label: 'Undo', onClick }) — toasts with
-// an action stay up longer so there is time to tap it.
+const isTyping = el => el?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el?.tagName ?? '')
+
+/* toast('Saved') or toast('Deleted', { label: 'Undo', onClick }) — toasts with
+   an action stay up longer so there is time to tap it. Up to three stack, so
+   a new toast never takes away the Undo of the one before; Ctrl/⌘+Z runs the
+   newest Undo. */
 export function ToastProvider({ children }) {
-  const [msg, setMsg] = useState(null) // { text, action? }
-  const timer = useRef()
-  const toast = useCallback((text, action) => {
-    setMsg({ text, action })
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => setMsg(null), action ? 6000 : 2600)
+  const [toasts, setToasts] = useState([]) // [{ id, text, action? }]
+  const timers = useRef(new Map())
+
+  const dismiss = useCallback(id => {
+    clearTimeout(timers.current.get(id))
+    timers.current.delete(id)
+    setToasts(list => list.filter(t => t.id !== id))
   }, [])
+
+  const toast = useCallback(
+    (text, action) => {
+      const id = Math.random().toString(36).slice(2)
+      setToasts(list => [...list, { id, text, action }].slice(-MAX_TOASTS))
+      timers.current.set(
+        id,
+        setTimeout(() => dismiss(id), action ? 6000 : 2600),
+      )
+    },
+    [dismiss],
+  )
+
+  const run = useCallback(
+    t => {
+      dismiss(t.id)
+      t.action.onClick()
+    },
+    [dismiss],
+  )
+
+  useEffect(() => {
+    const onKey = e => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== 'z' || isTyping(e.target)) return
+      const last = [...toasts].reverse().find(t => t.action?.label === 'Undo')
+      if (!last) return
+      e.preventDefault()
+      run(last)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [toasts, run])
+
   return (
     <ToastCtx.Provider value={toast}>
       {children}
-      {msg && (
-        <div className="anim-toast fixed bottom-6 left-1/2 z-60 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-slate-900 py-2 pl-4 pr-2 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900">
-          {msg.text}
-          {msg.action ? (
-            <button
-              onClick={() => {
-                clearTimeout(timer.current)
-                setMsg(null)
-                msg.action.onClick()
-              }}
-              className="rounded-full px-2.5 py-0.5 font-bold text-accent transition hover:bg-white/10 dark:text-brand-600 dark:hover:bg-slate-900/5"
+      {toasts.length > 0 && (
+        <div
+          className="pointer-events-none fixed inset-x-0 bottom-6 z-60 flex flex-col items-center gap-2 px-4"
+          role="status"
+          aria-live="polite"
+        >
+          {toasts.map(t => (
+            <div
+              key={t.id}
+              className="anim-toast pointer-events-auto flex max-w-full items-center gap-1 rounded-full bg-slate-900 py-2 pl-4 pr-2 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900"
             >
-              {msg.action.label}
-            </button>
-          ) : (
-            <span className="pr-2" />
-          )}
+              <span className="truncate">{t.text}</span>
+              {t.action ? (
+                <button
+                  onClick={() => run(t)}
+                  className="shrink-0 rounded-full px-2.5 py-0.5 font-bold text-accent transition hover:bg-white/10 dark:text-brand-600 dark:hover:bg-slate-900/5"
+                >
+                  {t.action.label}
+                </button>
+              ) : (
+                <span className="pr-2" />
+              )}
+            </div>
+          ))}
         </div>
       )}
     </ToastCtx.Provider>

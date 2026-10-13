@@ -39,7 +39,7 @@ body {
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translate(-50%, 8px); }
+  from { opacity: 0; transform: translateY(8px); }
 }
 
 .anim-backdrop { animation: fade-in 0.18s ease-out; }

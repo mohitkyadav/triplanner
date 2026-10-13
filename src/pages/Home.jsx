@@ -3,10 +3,116 @@ import DataSafety from '../components/DataSafety'
 import ScanModal from '../components/ScanModal'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import TripForm from '../components/TripForm'
-import { IconPlus, IconQrCode, IconTrash, IconUpload, btnGhost, btnPrimary, iconBtn, useToast } from '../components/ui'
+import {
+  IconNavigation,
+  IconPlus,
+  IconQrCode,
+  IconTrash,
+  IconUpload,
+  Segmented,
+  btnChipBrand,
+  btnGhost,
+  btnPrimary,
+  iconBtn,
+  useToast,
+} from '../components/ui'
 import { fmtRange, todayISO } from '../lib/dates'
 import { downloadJSON, exportPayload, parseImport } from '../lib/io'
 import { makeTrip, useStore } from '../lib/store'
+import { countdown, groupTrips, tripPhase } from '../lib/trips'
+import { useWeatherEnabled } from '../lib/weather'
+
+const GROUP_TITLE = { ongoing: 'Under way', upcoming: 'Upcoming', undated: 'No dates yet', past: 'Past trips' }
+
+function TripRow({ trip, navigate, onDelete }) {
+  const phase = tripPhase(trip)
+  const stops = trip.days.reduce((n, d) => n + d.items.length, 0)
+  const open = () => navigate(`/trip/${trip.id}`)
+  const when = countdown(phase)
+  return (
+    <li
+      onClick={open}
+      onKeyDown={e => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault()
+          open()
+        }
+      }}
+      role="link"
+      tabIndex={0}
+      aria-label={`Open ${trip.name}`}
+      className={`group cursor-pointer rounded-2xl bg-white p-4 shadow-sm outline-none ring-1 transition hover:shadow-md hover:ring-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-slate-900 dark:hover:ring-brand-600 ${
+        phase.phase === 'ongoing' ? 'ring-brand-300 dark:ring-brand-600' : 'ring-slate-200 dark:ring-slate-800'
+      } ${phase.phase === 'past' ? 'opacity-75' : ''}`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-lg font-semibold">{trip.name}</h3>
+          {trip.destination && (
+            <p className="truncate text-sm text-slate-500 dark:text-slate-400">{trip.destination}</p>
+          )}
+        </div>
+        {when && (
+          <span className="mt-1 shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-400">
+            {when}
+          </span>
+        )}
+        <button
+          className={`${iconBtn} opacity-60 group-hover:opacity-100`}
+          onClick={e => {
+            e.stopPropagation()
+            onDelete(trip)
+          }}
+          aria-label={`Delete ${trip.name}`}
+        >
+          <IconTrash className="size-4" />
+        </button>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <p className="min-w-0 flex-1 truncate text-xs font-medium text-slate-400 dark:text-slate-500">
+          {[
+            fmtRange(trip.startDate, trip.endDate),
+            `${trip.days.length} day${trip.days.length === 1 ? '' : 's'}`,
+            `${stops} stop${stops === 1 ? '' : 's'}`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+        {phase.phase === 'ongoing' && (
+          <button
+            className={btnChipBrand}
+            onClick={e => {
+              e.stopPropagation()
+              navigate(`/trip/${trip.id}/today`)
+            }}
+          >
+            <IconNavigation className="size-3.5" />
+            Trip mode
+          </button>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function WeatherSetting() {
+  const [on, setOn] = useWeatherEnabled()
+  return (
+    <div className="mx-auto w-full max-w-72 space-y-1.5">
+      <Segmented
+        value={on ? 'on' : 'off'}
+        onChange={v => setOn(v === 'on')}
+        options={[
+          { value: 'on', label: 'Forecasts on' },
+          { value: 'off', label: 'Off' },
+        ]}
+      />
+      <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
+        Forecasts send only the destination name to Open-Meteo.
+      </p>
+    </div>
+  )
+}
 
 export default function Home({ navigate }) {
   const { state, dispatch } = useStore()
@@ -102,46 +208,20 @@ export default function Home({ navigate }) {
           </div>
         ) : (
           <>
-            <ul className="space-y-3">
-              {state.trips.map(trip => {
-                const stops = trip.days.reduce((n, d) => n + d.items.length, 0)
-                return (
-                  <li
-                    key={trip.id}
-                    onClick={() => navigate(`/trip/${trip.id}`)}
-                    className="group cursor-pointer rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 transition hover:shadow-md hover:ring-brand-300 dark:bg-slate-900 dark:ring-slate-800 dark:hover:ring-brand-600"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-lg font-semibold">{trip.name}</h3>
-                        {trip.destination && (
-                          <p className="truncate text-sm text-slate-500 dark:text-slate-400">{trip.destination}</p>
-                        )}
-                      </div>
-                      <button
-                        className={`${iconBtn} opacity-60 group-hover:opacity-100`}
-                        onClick={e => {
-                          e.stopPropagation()
-                          deleteTrip(trip)
-                        }}
-                        aria-label={`Delete ${trip.name}`}
-                      >
-                        <IconTrash className="size-4" />
-                      </button>
-                    </div>
-                    <p className="mt-2 text-xs font-medium text-slate-400 dark:text-slate-500">
-                      {[
-                        fmtRange(trip.startDate, trip.endDate),
-                        `${trip.days.length} day${trip.days.length === 1 ? '' : 's'}`,
-                        `${stops} stop${stops === 1 ? '' : 's'}`,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                  </li>
-                )
-              })}
-            </ul>
+            <div className="space-y-6">
+              {groupTrips(state.trips).map(group => (
+                <section key={group.phase} aria-label={GROUP_TITLE[group.phase]}>
+                  <h2 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    {GROUP_TITLE[group.phase]}
+                  </h2>
+                  <ul className="space-y-3">
+                    {group.trips.map(trip => (
+                      <TripRow key={trip.id} trip={trip} navigate={navigate} onDelete={deleteTrip} />
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
 
             <div className="mt-6">
               <DataSafety onExport={exportAll} onImport={() => fileRef.current?.click()} />
@@ -149,8 +229,9 @@ export default function Home({ navigate }) {
           </>
         )}
 
-        <div className="mt-10">
+        <div className="mt-10 space-y-4">
           <ThemeSwitcher />
+          <WeatherSetting />
         </div>
       </main>
 

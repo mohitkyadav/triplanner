@@ -22,11 +22,21 @@ export const RENAMED_TYPES = { transport: 'train' }
 export const catById = id =>
   CATEGORIES.find(c => c.id === (RENAMED_TYPES[id] ?? id)) ?? CATEGORIES[CATEGORIES.length - 1]
 
+// "BER → LIS", "→ LIS", "BER →", or '' for a flight with neither end.
+export function flightRoute(item) {
+  const from = (item.from ?? '').trim()
+  const to = (item.to ?? '').trim()
+  if (from && to) return `${from} → ${to}`
+  if (from) return `${from} →`
+  return to ? `→ ${to}` : ''
+}
+
 export function titleFor(item) {
   if (item.title) return item.title
   if (item.type === 'flight') {
-    const dir = item.direction === 'departure' ? 'Departure' : 'Arrival'
-    return item.flightNo ? `${dir} · ${item.flightNo}` : dir
+    const route = flightRoute(item)
+    if (route && item.flightNo) return `${route} · ${item.flightNo}`
+    return route || (item.flightNo ? `Flight ${item.flightNo}` : 'Flight')
   }
   return 'Untitled'
 }

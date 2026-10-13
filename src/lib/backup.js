@@ -1,3 +1,4 @@
+import { kvDelete, kvGet, kvSet } from './idb'
 import { exportPayload } from './io'
 
 /* Storage durability.
@@ -18,8 +19,6 @@ import { exportPayload } from './io'
    install the app and to export a file by hand. Every function fails softly:
    private windows can refuse IndexedDB completely. */
 
-const DB_NAME = 'triplanner'
-const STORE = 'kv'
 const K_SNAPSHOT = 'snapshot'
 const K_HANDLE = 'backupFile'
 const K_META = 'meta'
@@ -28,51 +27,6 @@ const K_META = 'meta'
 // drag or a burst of edits does not rewrite the file many times.
 const MIRROR_DELAY = 1200
 const FILE_DELAY = 5000
-
-/* ---------- IndexedDB key/value helpers ---------- */
-
-let dbPromise = null
-
-function db() {
-  if (dbPromise) return dbPromise
-  dbPromise = new Promise((resolve, reject) => {
-    if (!globalThis.indexedDB) {
-      reject(new Error('no IndexedDB'))
-      return
-    }
-    const req = indexedDB.open(DB_NAME, 1)
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE)
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-    req.onblocked = () => reject(new Error('IndexedDB is blocked'))
-  }).catch(err => {
-    dbPromise = null // let a later call try again
-    throw err
-  })
-  return dbPromise
-}
-
-const run = (mode, fn) =>
-  db().then(
-    d =>
-      new Promise((resolve, reject) => {
-        const t = d.transaction(STORE, mode)
-        const req = fn(t.objectStore(STORE))
-        t.oncomplete = () => resolve(req?.result)
-        t.onerror = () => reject(t.error)
-        t.onabort = () => reject(t.error)
-      }),
-  )
-
-const kvGet = key => run('readonly', s => s.get(key)).catch(() => null)
-const kvSet = (key, value) =>
-  run('readwrite', s => s.put(value, key))
-    .then(() => true)
-    .catch(() => false)
-const kvDelete = key =>
-  run('readwrite', s => s.delete(key))
-    .then(() => true)
-    .catch(() => false)
 
 /* ---------- state the backup card shows ---------- */
 

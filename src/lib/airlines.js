@@ -21,3 +21,10 @@ export function airlineFromFlightNo(flightNo) {
 // One canonical 128×128 (2× retina for the largest chip) image per airline —
 // every UI spot shares the same URL, so the service worker caches one file.
 export const airlineLogoUrl = iata => `https://images.kiwi.com/airlines/128/${iata}.png`
+
+// A live status page for the flight, from its number alone ("LH 1178" →
+// …/flights/lh1178). Null when the text is not a flight number.
+export function flightTrackerUrl(flightNo) {
+  const m = (flightNo || '').trim().toUpperCase().match(/^([A-Z][A-Z0-9]|[0-9][A-Z])[ -]?(\d{1,4}[A-Z]?)$/)
+  return m ? `https://www.flightradar24.com/data/flights/${(m[1] + m[2]).toLowerCase()}` : null
+}

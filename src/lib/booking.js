@@ -173,10 +173,27 @@ function classify(summary, description, location) {
 const notesFor = (description, url) =>
   [String(description ?? '').trim(), url && `Booking: ${url}`].filter(Boolean).join('\n').slice(0, 600)
 
+/* "Flight LH 1178 Berlin (BER) → Lisbon (LIS)" → { from: 'Berlin (BER)',
+   to: 'Lisbon (LIS)' }. The flight number and filler words ("flight", "your
+   booking") are dropped first, so the arrow or "to" between the two places is
+   all that is left — "Your flight to Porto" names no departure at all. */
+export function parseRoute(summary) {
+  const s = String(summary ?? '')
+    .replace(/\b(flight|flug|vol|vuelo|voo|your|my|the|trip|booking|confirmation|reservation|itinerary|e-?ticket)\b/gi, ' ')
+    .replace(/\b([A-Z][A-Z0-9]|\d[A-Z])[\s-]?\d{1,4}\b/g, ' ')
+    .replace(/[:|]/g, ' ')
+  const m = /^\s*(.+?)\s*(?:→|->|⇒|✈|\bto\b|\s[–—-]\s)\s*(.+?)\s*$/i.exec(s)
+  return m ? { from: m[1].trim(), to: m[2].trim() } : { from: '', to: '' }
+}
+
+// An end the same day, or the morning after, is the plan's end time.
+const endTimeOf = (start, end) =>
+  end?.time && end.date && (end.date === start.date || daysBetween(start.date, end.date) === 1) ? end.time : ''
+
 /* Reads a file into rows the preview can show:
      { key, date, time, item, fromUtc, duplicate }
-   `trip` decides the direction of a flight and marks a plan the trip already
-   holds. Throws when the file carries nothing usable. */
+   `trip` marks a plan the trip already holds. Throws when the file carries
+   nothing usable. */
 export function readBooking(text, trip) {
   const events = parseIcs(text)
   if (events.length === 0) throw new Error('this file holds no calendar events')
@@ -195,22 +212,22 @@ export function readBooking(text, trip) {
     const key = `${event.UID?.value ?? index}-${kind.type}`
 
     if (kind.type === 'flight') {
-      // A flight event runs from take-off to landing. The trip's last day is a
-      // way home; anything earlier brings the traveller in.
-      const isDeparture = Boolean(trip?.endDate) && start.date >= trip.endDate
-      const when = !isDeparture && end?.time ? end : start
+      // A flight event runs from take-off to landing: one plan on the day it
+      // leaves. LOCATION names the airport it leaves from.
+      const route = parseRoute(summary)
       rows.push({
         key,
-        date: when.date,
-        time: when.time,
-        fromUtc: Boolean(when.fromUtc),
+        date: start.date,
+        time: start.time,
+        fromUtc: Boolean(start.fromUtc || end?.fromUtc),
         item: {
           type: 'flight',
-          flightNo: kind.flightNo,
-          direction: isDeparture ? 'departure' : 'arrival',
-          location,
+          flightNo: kind.flightNo ?? '',
+          from: route.from || location,
+          to: route.to,
           title: cleanTitle(summary),
-          time: when.time,
+          time: start.time,
+          endTime: endTimeOf(start, end),
           place: '',
           notes,
         },
@@ -247,6 +264,7 @@ export function readBooking(text, trip) {
         type: kind.type,
         title: cleanTitle(summary) || 'Booking',
         time: start.time,
+        endTime: endTimeOf(start, end),
         place: location,
         notes,
       },

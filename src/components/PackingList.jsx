@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { missingFrom, PACKING_TEMPLATES } from '../lib/packing'
 import { uid, useStore } from '../lib/store'
 import {
   IconCheckCircle,
@@ -11,7 +12,7 @@ import {
 } from './ui'
 
 export default function PackingList({ trip }) {
-  const { dispatch } = useStore()
+  const { state, dispatch } = useStore()
   const list = trip.packing ?? []
   const packed = list.filter(p => p.done).length
   const [open, setOpen] = useState(false)
@@ -23,6 +24,26 @@ export default function PackingList({ trip }) {
     if (!t) return
     dispatch({ type: 'packing/add', tripId: trip.id, item: { id: uid(), text: t, done: false } })
     setText('')
+  }
+
+  // Other trips' lists, newest first, to copy from.
+  const otherLists = state.trips.filter(t => t.id !== trip.id && (t.packing ?? []).length > 0)
+
+  function addFrom(e) {
+    const value = e.target.value
+    e.target.value = ''
+    const [kind, id] = value.split(':')
+    const source =
+      kind === 'template'
+        ? PACKING_TEMPLATES.find(t => t.id === id)?.items
+        : state.trips.find(t => t.id === id)?.packing.map(p => p.text)
+    const texts = missingFrom(list, source ?? [])
+    if (texts.length === 0) return
+    dispatch({
+      type: 'packing/addMany',
+      tripId: trip.id,
+      items: texts.map(t => ({ id: uid(), text: t, done: false })),
+    })
   }
 
   return (
@@ -80,6 +101,32 @@ export default function PackingList({ trip }) {
               ))}
             </ul>
           )}
+          <select
+            className="mb-3 w-full rounded-xl bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+            defaultValue=""
+            onChange={addFrom}
+            aria-label="Add items from a list"
+          >
+            <option value="" disabled>
+              Add from a list…
+            </option>
+            <optgroup label="Ready-made">
+              {PACKING_TEMPLATES.map(t => (
+                <option key={t.id} value={`template:${t.id}`}>
+                  {t.label}
+                </option>
+              ))}
+            </optgroup>
+            {otherLists.length > 0 && (
+              <optgroup label="From another trip">
+                {otherLists.map(t => (
+                  <option key={t.id} value={`trip:${t.id}`}>
+                    {t.name} ({t.packing.length})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
           <form onSubmit={addItem} className="flex gap-2">
             <input
               className={inputCls}

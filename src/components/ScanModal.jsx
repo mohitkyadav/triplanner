@@ -79,7 +79,7 @@ export default function ScanModal({ onImport, onClose }) {
   return (
     <Modal title={trips ? 'Shared trip' : 'Scan a shared trip'} onClose={onClose}>
       {trips ? (
-        <ImportPreview trips={trips} onConfirm={() => onImport(trips)} onCancel={onClose} />
+        <ImportPreview trips={trips} onConfirm={onImport} onCancel={onClose} />
       ) : error ? (
         <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">{error}</p>
       ) : (

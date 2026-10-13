@@ -6,10 +6,25 @@ device; nothing is uploaded.
 ## Features
 
 - **Trips → days → plans** — days come from the date range; 15 plan types.
-- **Trip mode** — during the trip: the plan you are on, what comes next, how
-  long until then, directions for the hop, one tap to mark it done.
+  Change the dates later and the days follow: the plans move with the trip,
+  or keep their dates — your choice. Plans sit in time order.
+- **Start and end times** — a plan can say when it ends; a flight is one plan
+  from → to, leaving and landing. Overlaps are flagged.
+- **Trip mode** — during the trip, on the trip's own clock (set a time zone
+  per trip): the plan you are on, when it ends, what comes next, the free
+  time between, directions for the hop, your documents, one tap to mark it
+  done. The app shortcut "Today's trip" opens it directly.
+- **Documents offline** — attach boarding passes, tickets and confirmations
+  (PDF or photo) to a plan; they open with no signal.
 - **Import booking** — feed it the `.ics` from a flight, hotel or rail
-  confirmation and it fills the days. Preview first, one Undo after.
+  confirmation and it fills the days. Preview first, one Undo after. On
+  Android, share the file straight to the installed app; on desktop, open
+  `.ics`/`.json` files with it.
+- **Budget** — a budget target, planned vs paid, a breakdown by category,
+  costs in other currencies (with your own exchange rates, so it works
+  offline), and a split between travellers with who-owes-whom.
+- **Weather** — a forecast on each day within 16 days, from Open-Meteo (no
+  key; only the destination name is sent; can be turned off).
 - **Maps with no link to paste** — `place` takes any text: a Maps link opens
   that exact place, anything else gives a Google and an Apple search button.
   Empty falls back to the plan name plus the destination.
@@ -17,23 +32,36 @@ device; nothing is uploaded.
 - **Hotel stays** — a check-in and a check-out make the days between show
   "Staying at …".
 - **Share** — the trip travels inside the link, or as a QR code the built-in
-  scanner reads. No server.
+  scanner reads. No server. Leave out costs or notes if you like. Receiving a
+  trip you already have offers *Keep both* or *Replace mine*.
 - **Backup** — an automatic backup file, a copy on the device, storage
   protection and an install prompt, in one card.
-- Costs per plan/day/trip · day routes in Maps · calendar export · drag to
-  reorder · undo deletes · packing list · light/dark/system · installable and
-  fully offline.
+- Costs per plan/day/trip · day routes in Maps · live flight status links ·
+  calendar export with reminders · drag to reorder, or move a plan to another
+  day from its form · undo (Ctrl/⌘+Z too) · packing list with ready-made lists
+  and copy-from-another-trip · duplicate a trip · grouped home screen with
+  countdowns · light/dark/system · installable, fully offline, and the app
+  open in two tabs stays in sync. Phone Back closes dialogs; everything works
+  from the keyboard.
 
 ## Development
 
 ```bash
 npm install
-npm run dev     # dev server
-npm run build   # → dist/
+npm run dev          # dev server
+npm run build        # → dist/
+npm test             # integration tests (Vitest + Testing Library, jsdom)
+npm run lint         # ESLint
+npm run format       # Prettier
+npm run screenshots  # after a build: regenerate the install-prompt screenshots
 ```
 
 Vite · React 18 · Tailwind v4 · dnd-kit · vite-plugin-pwa. `qrcode` and `jsQR`
-load only when you share or scan.
+load only when you share or scan. New app versions wait for a tap on
+*Reload*, so an update never interrupts a form.
+
+The tests in `src/test/` render the whole app on a seeded device and drive it
+like a user; there are deliberately no unit tests.
 
 Deploy: `netlify.toml` is ready — point Netlify at the repo, or run
 `npx netlify-cli deploy --prod`.
@@ -42,11 +70,16 @@ Deploy: `netlify.toml` is ready — point Netlify at the repo, or run
 
 | Concern | Where |
 |---|---|
-| State | `lib/store.jsx` — one reducer, `localStorage` key `triplanner:v1` |
+| State | `lib/store.jsx` — one reducer, `localStorage` key `triplanner:v1`, written after a 250 ms pause (and at once when the tab hides). Another tab's save is taken over through the `storage` event. |
+| Documents | `lib/files.js` — the files live in IndexedDB (`files` store), plans keep `{ id, name, type, size }`. Unreferenced files are cleared a day after they were added. |
+| Dates | `lib/reschedule.js` — new trip dates shift or keep the days; empty days outside the range go, days with plans stay |
+| Budget | `lib/money.js` — conversion with `trip.rates`, the split and the settle-up |
+| Weather | `lib/weather.js` — Open-Meteo geocoding + forecast, cached for offline |
+| Inbox | `lib/inbox.js` + `public/share-target-sw.js` — files shared to the app (share target) or opened with it (file handlers) |
 | Durability | `lib/backup.js` — IndexedDB copy after every change, plus an optional backup file (File System Access). Restores itself if `localStorage` is ever empty; follows deletions, so a delete stays deleted. |
 | Booking reader | `lib/booking.js` — the RFC 5545 subset a confirmation uses. Times are taken as written; only UTC is converted, and flagged. |
 | Map links | `lib/maps.js` — every map link, no API key |
-| Trip mode | `lib/schedule.js` — a plan has a start time and nothing more, so no length is guessed |
+| Trip mode | `lib/schedule.js` — a plan has a start time and, when known, an end time; no length is ever guessed |
 | Airlines | `lib/airlines-data.js` — 970 IATA codes offline (`scripts/gen-airlines.mjs` refreshes). Logos from Kiwi.com's keyless CDN, falling back to ✈️. |
 
 ## Data format
@@ -59,21 +92,29 @@ Exports and share links carry:
   "trips": [{
     "id": "…", "name": "Summer in Portugal", "destination": "Lisbon",
     "startDate": "2026-08-01", "endDate": "2026-08-05", "currency": "EUR",
+    "timeZone": "Europe/Lisbon", "budget": 1500,
+    "travellers": ["Ana", "Ben"], "rates": { "USD": 0.92 },
     "packing": [{ "id": "…", "text": "Passport", "done": false }],
     "days": [{
       "id": "…", "date": "2026-08-01", "title": "",
       "items": [
-        { "id": "…", "type": "flight", "flightNo": "LH 1178", "direction": "arrival", "location": "Lisbon LIS", "time": "10:35", "place": "", "notes": "", "cost": 120 },
-        { "id": "…", "type": "restaurant", "title": "Cervejaria Ramiro", "time": "13:00", "place": "Rua Ramiro 1", "notes": "Garlic prawns" }
+        { "id": "…", "type": "flight", "flightNo": "LH 1178", "from": "Berlin BER", "to": "Lisbon LIS", "time": "07:10", "endTime": "09:45", "place": "", "notes": "", "cost": 120, "paid": true, "paidBy": "Ana" },
+        { "id": "…", "type": "restaurant", "title": "Cervejaria Ramiro", "time": "13:00", "endTime": "14:30", "place": "Rua Ramiro 1", "notes": "Garlic prawns", "cost": 40, "currency": "USD",
+          "attachments": [{ "id": "…", "name": "booking.pdf", "type": "application/pdf", "size": 48213 }] }
       ]
     }]
   }]
 }
 ```
 
-`cost`, `status` (`done` / `skipped`) and `place` are optional. Importing a trip
-whose `id` you already have updates it. Older data is migrated on load:
-`mapsUrl` → `place`, `type: "transport"` → `"train"`.
+`cost` (with `currency` when it differs from the trip's, `paid`, `paidBy`),
+`endTime`, `status` (`done` / `skipped`), `place` and `attachments` are
+optional; an `endTime` before `time` runs past midnight. `attachments` only
+reference files kept on the device that added them. Importing a trip whose
+`id` you already have asks whether to keep both or replace yours. Older data
+is migrated on load: `mapsUrl` → `place`, `type: "transport"` → `"train"`, and
+a flight's `direction` + `location` → `from`/`to` with its time as `time`
+(departure) or `endTime` (arrival).
 
 A share link is this JSON, deflate-compressed and base64url-encoded in the URL
 fragment, so it never reaches a server.

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import AirlineLogo from '../components/AirlineLogo'
+import { DocumentChips } from '../components/Documents'
 import ItemForm from '../components/ItemForm'
 import MapLinks from '../components/MapLinks'
+import WeatherChip from '../components/WeatherChip'
 import {
   btnChip,
   btnChipBrand,
@@ -16,18 +18,20 @@ import {
   IconNavigation,
   IconPencil,
   IconPlus,
+  IconRadar,
   IconRoute,
   IconXCircle,
   iconBtn,
   useToast,
 } from '../components/ui'
-import { airlineFromFlightNo } from '../lib/airlines'
-import { catById, titleFor } from '../lib/categories'
-import { fmtDate } from '../lib/dates'
+import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
+import { catById, flightRoute, titleFor } from '../lib/categories'
+import { deviceTimeZone, fmtDate } from '../lib/dates'
 import { dayRouteUrl, pairRouteUrl } from '../lib/maps'
-import { dayCost, fmtMoney } from '../lib/money'
-import { dayPlan, fmtClock, fmtDuration, gapBetween, useClock } from '../lib/schedule'
+import { costCurrency, dayCost, fmtMoney } from '../lib/money'
+import { dayPlan, fmtClock, fmtDuration, fmtTimes, gapBetween, useClock } from '../lib/schedule'
 import { uid, useStore } from '../lib/store'
+import { useWeather } from '../lib/weather'
 
 /* Trip mode: one day at a time, led by the plan to act on right now. The
    classic day list stays the place to build a trip; this view is for the days
@@ -36,23 +40,24 @@ import { uid, useStore } from '../lib/store'
 const STATUS_NEXT = { undefined: 'done', done: 'skipped', skipped: undefined }
 const STATUS_WORD = { done: 'Marked done', skipped: 'Marked skipped', undefined: 'Back to planned' }
 
-// How long it is from the start of one plan to the start of the next. Both
-// times come from the user, so this is never a guess. Two plans that start at
-// the same time are a clash worth showing.
-function GapChip({ minutes }) {
-  if (minutes == null) return null
-  if (minutes === 0) {
+// What lies between one plan and the next (see gapBetween). Both times come
+// from the user, so this is never a guess. Plans that start together, or run
+// into each other, are a clash worth showing.
+function GapChip({ gap }) {
+  if (!gap) return null
+  if (gap.kind === 'clash') {
     return (
       <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-bold text-rose-700 dark:bg-rose-400/10 dark:text-rose-300">
         <IconAlert className="size-3" />
-        same time
+        {gap.minutes === 0 ? 'same time' : `overlaps ${fmtDuration(gap.minutes)}`}
       </span>
     )
   }
+  if (gap.minutes === 0) return null
   return (
     <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-slate-400 dark:text-slate-500">
       <IconHourglass className="size-3" />
-      {fmtDuration(minutes)} later
+      {fmtDuration(gap.minutes)} {gap.kind === 'free' ? 'free' : 'later'}
     </span>
   )
 }
@@ -64,14 +69,22 @@ function Chip({ item, className = 'size-11 rounded-xl text-xl' }) {
   return airline ? <AirlineLogo iata={airline.iata} name={airline.name} className={className} fallback={emoji} /> : emoji
 }
 
-// A plan carries a start time and nothing more.
-const timeLabel = entry => (entry.start == null ? 'Any time' : fmtClock(entry.start))
+const timeLabel = entry => (entry.start == null ? 'Any time' : fmtTimes(entry.item))
+
+// "ends in 20 min" for the plan you are on, "in 45 min" for the next one.
+function countdownFor(entry, running, now) {
+  if (now == null) return ''
+  if (running) return entry.end != null && entry.end > now ? `ends in ${fmtDuration(entry.end - now)}` : ''
+  return entry.start != null && entry.start > now ? `in ${fmtDuration(entry.start - now)}` : ''
+}
 
 /* ---------- the card that leads the view ---------- */
 
-function HeroCard({ trip, entry, label, running, onEdit, onStatus }) {
+function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
   const { item } = entry
   const cat = catById(item.type)
+  const countdown = countdownFor(entry, running, now)
+  const tracker = item.type === 'flight' ? flightTrackerUrl(item.flightNo) : null
 
   return (
     <section
@@ -99,19 +112,21 @@ function HeroCard({ trip, entry, label, running, onEdit, onStatus }) {
           <h2 className="text-xl font-bold leading-tight">{titleFor(item)}</h2>
           <p className="mt-1 text-sm font-semibold tabular-nums text-brand-600 dark:text-brand-300">
             {timeLabel(entry)}
+            {countdown && <span className="font-medium text-slate-500 dark:text-slate-400"> · {countdown}</span>}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
             <span className={`rounded-md px-1.5 py-0.5 font-medium ${cat.badge}`}>{cat.label}</span>
-            {item.location && <span>{item.location}</span>}
+            {item.type === 'flight' && item.title && flightRoute(item) && <span>{flightRoute(item)}</span>}
             {Number.isFinite(item.cost) && (
               <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">
-                {fmtMoney(item.cost, trip.currency)}
+                {fmtMoney(item.cost, costCurrency(trip, item))}
               </span>
             )}
           </div>
           {item.notes && (
             <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">{item.notes}</p>
           )}
+          <DocumentChips docs={item.attachments} className="mt-2.5" />
         </div>
       </div>
 
@@ -125,6 +140,12 @@ function HeroCard({ trip, entry, label, running, onEdit, onStatus }) {
           Skip
         </button>
         <span className="flex-1" />
+        {tracker && (
+          <a className={btnChip} href={tracker} target="_blank" rel="noopener noreferrer">
+            <IconRadar className="size-4" />
+            Track
+          </a>
+        )}
         <MapLinks trip={trip} item={item} hero />
       </div>
     </section>
@@ -143,7 +164,7 @@ function Hop({ trip, from, to }) {
         {url ? `Directions to ${titleFor(to.item)}` : `Then ${titleFor(to.item)}`}
       </span>
       <span className="flex-1" />
-      <GapChip minutes={gap} />
+      <GapChip gap={gap} />
     </>
   )
   const cls =
@@ -178,6 +199,11 @@ function PlanRow({ trip, entry, clash, muted, onEdit, onStatus }) {
       >
         <span className="w-11 shrink-0 text-center text-xs font-bold tabular-nums text-slate-500 dark:text-slate-400">
           {entry.start == null ? '—' : fmtClock(entry.start)}
+          {entry.end != null && (
+            <span className="block text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+              {fmtClock(entry.end)}
+            </span>
+          )}
         </span>
         <Chip item={item} className="size-8 rounded-lg text-sm" />
         <span className="min-w-0 flex-1">
@@ -186,11 +212,12 @@ function PlanRow({ trip, entry, clash, muted, onEdit, onStatus }) {
           </span>
           <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-slate-500 dark:text-slate-400">
             <span>{catById(item.type).label}</span>
-            {Number.isFinite(item.cost) && <span>{fmtMoney(item.cost, trip.currency)}</span>}
+            {Number.isFinite(item.cost) && <span>{fmtMoney(item.cost, costCurrency(trip, item))}</span>}
+            {item.attachments?.length > 0 && <span>📎 {item.attachments.length}</span>}
             {clash && (
               <span className="inline-flex items-center gap-0.5 font-bold text-rose-600 dark:text-rose-400">
                 <IconAlert className="size-3" />
-                same time
+                {clash.minutes === 0 ? 'same time' : 'overlaps'}
               </span>
             )}
           </span>
@@ -230,9 +257,10 @@ function Section({ title, count, children }) {
 export default function Today({ id, navigate }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
-  const { minutes, today } = useClock()
   const trip = state.trips.find(t => t.id === id)
-  const days = trip?.days ?? []
+  const { minutes, today } = useClock(trip?.timeZone)
+  const days = useMemo(() => trip?.days ?? [], [trip])
+  const weather = useWeather(trip)
 
   const [pickedIndex, setPickedIndex] = useState(null) // null follows the clock
   const [itemModal, setItemModal] = useState(null) // { dayId, item? }
@@ -270,14 +298,17 @@ export default function Today({ id, navigate }) {
   const day = days[dayIndex]
   const isToday = day.date === today
   const plan = dayPlan(day, isToday ? minutes : null)
-  const cost = dayCost(day)
+  const cost = dayCost(trip, day)
+  // The trip's clock, shown when it is not the one on this device.
+  const zoneClock = trip.timeZone && trip.timeZone !== deviceTimeZone() ? fmtClock(minutes) : null
   const routeUrl = dayRouteUrl(trip, day)
 
   // What the view shows in order, so a clash is marked where it is seen.
   const sequence = [plan.hero, plan.then, ...plan.later].filter(Boolean)
-  const clashing = new Set()
+  const clashing = new Map()
   sequence.forEach((entry, i) => {
-    if (gapBetween(sequence[i - 1], entry) === 0) clashing.add(entry)
+    const gap = gapBetween(sequence[i - 1], entry)
+    if (gap?.kind === 'clash') clashing.set(entry, gap)
   })
 
   function setStatus(item, status) {
@@ -297,11 +328,11 @@ export default function Today({ id, navigate }) {
     })
   }
 
-  function saveItem(data) {
+  function saveItem(data, toDayId) {
     if (itemModal.item) {
-      dispatch({ type: 'item/update', tripId: trip.id, dayId: day.id, itemId: itemModal.item.id, patch: data })
+      dispatch({ type: 'item/update', tripId: trip.id, dayId: day.id, toDayId, itemId: itemModal.item.id, patch: data })
     } else {
-      dispatch({ type: 'item/add', tripId: trip.id, dayId: day.id, item: { id: uid(), ...data } })
+      dispatch({ type: 'item/add', tripId: trip.id, dayId: toDayId ?? day.id, item: { id: uid(), ...data } })
     }
     setItemModal(null)
   }
@@ -326,7 +357,7 @@ export default function Today({ id, navigate }) {
 
   return (
     <div className="min-h-dvh">
-      <Header trip={trip} navigate={navigate} routeUrl={routeUrl} />
+      <Header trip={trip} navigate={navigate} routeUrl={routeUrl} zoneClock={zoneClock} />
 
       <div className="sticky top-14 z-30 border-b border-slate-200/60 bg-slate-50/80 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/80">
         <div className="mx-auto flex h-12 max-w-2xl items-center gap-1 px-3">
@@ -348,6 +379,7 @@ export default function Today({ id, navigate }) {
                 Today
               </span>
             )}
+            <WeatherChip day={weather?.[day.date]} />
           </div>
           {dayIndex !== clockIndex && (
             <button className={btnChip} onClick={() => setPickedIndex(null)} title="Back to the day the trip is on">
@@ -385,6 +417,7 @@ export default function Today({ id, navigate }) {
               entry={plan.hero}
               label={plan.running ? 'Now' : isToday ? 'Next up' : 'First up'}
               running={plan.running}
+              now={isToday ? minutes : null}
               onEdit={() => setItemModal({ dayId: day.id, item: plan.hero.item })}
               onStatus={status => setStatus(plan.hero.item, status)}
             />
@@ -408,14 +441,14 @@ export default function Today({ id, navigate }) {
 
         {plan.then && (
           <Section title={plan.hero && plan.later.length > 0 ? 'Then' : 'Also today'}>
-            <PlanRow {...rowProps(plan.then)} clash={clashing.has(plan.then)} />
+            <PlanRow {...rowProps(plan.then)} clash={clashing.get(plan.then)} />
           </Section>
         )}
 
         {plan.later.length > 0 && (
           <Section title="Later" count={plan.later.length}>
             {plan.later.map(entry => (
-              <PlanRow key={entry.item.id} {...rowProps(entry)} clash={clashing.has(entry)} />
+              <PlanRow key={entry.item.id} {...rowProps(entry)} clash={clashing.get(entry)} />
             ))}
           </Section>
         )}
@@ -459,6 +492,8 @@ export default function Today({ id, navigate }) {
           initial={itemModal.item}
           dayLabel={`day ${dayIndex + 1}`}
           trip={trip}
+          days={days}
+          dayId={day.id}
           onSave={saveItem}
           onDelete={deleteItem}
           onClose={() => setItemModal(null)}
@@ -468,7 +503,7 @@ export default function Today({ id, navigate }) {
   )
 }
 
-function Header({ trip, navigate, routeUrl }) {
+function Header({ trip, navigate, routeUrl, zoneClock }) {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-slate-50/80 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/80">
       <div className="mx-auto flex h-14 max-w-2xl items-center gap-1 px-4">
@@ -478,6 +513,12 @@ function Header({ trip, navigate, routeUrl }) {
         <div className="min-w-0 flex-1 px-1">
           <p className="truncate text-[11px] font-bold uppercase tracking-wide text-brand-600 dark:text-brand-300">
             Trip mode
+            {zoneClock && (
+              <span className="font-semibold normal-case tracking-normal text-slate-500 dark:text-slate-400">
+                {' '}
+                · {zoneClock} local time
+              </span>
+            )}
           </p>
           <h1 className="truncate text-sm font-semibold leading-tight">{trip.name}</h1>
         </div>

@@ -1,8 +1,9 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { airlineFromFlightNo } from '../lib/airlines'
-import { catById, titleFor } from '../lib/categories'
-import { fmtMoney } from '../lib/money'
+import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
+import { catById, flightRoute, titleFor } from '../lib/categories'
+import { costCurrency, fmtMoney } from '../lib/money'
+import { fmtTimes } from '../lib/schedule'
 import AirlineLogo from './AirlineLogo'
 import MapLinks from './MapLinks'
 import {
@@ -11,8 +12,9 @@ import {
   IconGrip,
   IconLogIn,
   IconLogOut,
-  IconPlaneLanding,
+  IconPaperclip,
   IconPlaneTakeoff,
+  IconRadar,
   IconXCircle,
 } from './ui'
 
@@ -40,13 +42,24 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
   let MetaIcon = null
   let metaText = ''
   if (item.type === 'flight') {
-    MetaIcon = item.direction === 'departure' ? IconPlaneTakeoff : IconPlaneLanding
-    metaText = item.direction === 'departure' ? 'Departure' : 'Arrival'
-    if (airline) metaText = `${airline.name} · ${metaText}`
-    if (item.location) metaText += ` · ${item.location}`
+    MetaIcon = IconPlaneTakeoff
+    // the title already shows the route when the plan has no label of its own
+    metaText = [airline?.name, item.title && flightRoute(item)].filter(Boolean).join(' · ')
+    if (!metaText) MetaIcon = null
   } else if (item.type === 'hotel') {
     MetaIcon = item.hotelAction === 'check-out' ? IconLogOut : IconLogIn
     metaText = item.hotelAction === 'check-out' ? 'Check-out' : 'Check-in'
+  }
+
+  const times = fmtTimes(item)
+  const tracker = item.type === 'flight' ? flightTrackerUrl(item.flightNo) : null
+  const docs = item.attachments?.length ?? 0
+  // The card opens with Enter or Space too; keys pressed on the buttons and
+  // links inside it stay theirs.
+  const onKeyDown = e => {
+    if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+    e.preventDefault()
+    onEdit?.()
   }
 
   return (
@@ -71,8 +84,12 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
       </button>
 
       <div
-        className={`flex min-w-0 flex-1 cursor-pointer items-start gap-3 ${skipped ? 'opacity-50' : ''}`}
+        className={`flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${skipped ? 'opacity-50' : ''}`}
         onClick={onEdit}
+        onKeyDown={onKeyDown}
+        role="button"
+        tabIndex={overlay ? -1 : 0}
+        aria-label={`Edit ${title}`}
       >
         {airline ? (
           <AirlineLogo iata={airline.iata} name={airline.name} className="size-10 rounded-xl" fallback={emojiBadge} />
@@ -82,9 +99,9 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className={`min-w-0 flex-1 truncate font-medium ${skipped ? 'line-through' : ''}`}>{title}</span>
-            {item.time && (
+            {times && (
               <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                {item.time}
+                {times}
               </span>
             )}
             <button
@@ -109,8 +126,27 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
             )}
             {Number.isFinite(item.cost) && (
               <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">
-                {fmtMoney(item.cost, trip?.currency)}
+                {fmtMoney(item.cost, costCurrency(trip, item))}
+                {item.paid && <span className="ml-1 font-medium text-emerald-600 dark:text-emerald-400">paid</span>}
               </span>
+            )}
+            {docs > 0 && (
+              <span className="inline-flex items-center gap-0.5" title={`${docs} document${docs === 1 ? '' : 's'}`}>
+                <IconPaperclip className="size-3.5" />
+                {docs}
+              </span>
+            )}
+            {tracker && (
+              <a
+                href={tracker}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline dark:text-brand-300"
+              >
+                <IconRadar className="size-3.5" />
+                Track
+              </a>
             )}
             <MapLinks trip={trip} item={item} />
           </div>

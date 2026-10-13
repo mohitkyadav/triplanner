@@ -5,9 +5,46 @@ const parse = iso => {
   return new Date(y, m - 1, d)
 }
 
-export function todayISO() {
+/* The date and the clock where the trip is. `timeZone` is an IANA name such
+   as "Europe/Lisbon"; empty means this device's own clock. */
+export function zonedNow(timeZone = '') {
   const d = new Date()
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  if (timeZone) {
+    try {
+      const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-CA', {
+          timeZone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hourCycle: 'h23',
+        })
+          .formatToParts(d)
+          .map(p => [p.type, p.value]),
+      )
+      return { today: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) * 60 + Number(parts.minute) }
+    } catch {
+      // an unknown zone — fall back to the device clock
+    }
+  }
+  return {
+    today: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    minutes: d.getHours() * 60 + d.getMinutes(),
+  }
+}
+
+export const todayISO = (timeZone = '') => zonedNow(timeZone).today
+
+export const deviceTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? ''
+
+export function timeZones() {
+  try {
+    return Intl.supportedValuesOf('timeZone')
+  } catch {
+    return []
+  }
 }
 
 export function addDaysISO(iso, n) {

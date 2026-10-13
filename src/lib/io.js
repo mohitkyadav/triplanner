@@ -28,28 +28,56 @@ export const slug = s =>
     .replace(/^-+|-+$/g, '') || 'trip'
 
 const str = v => (typeof v === 'string' ? v : '')
+const num = v => (Number.isFinite(+v) && v !== '' && v != null ? +v : null)
+const money = v => (num(v) != null && +v > 0 ? Math.round(+v * 100) / 100 : null)
+const code = v => str(v).trim().toUpperCase().slice(0, 3)
 
-function normalizeItem(i) {
-  if (!i || typeof i !== 'object') throw new Error('invalid item')
+/* Moves for data an older version wrote, applied when it loads:
+     `mapsUrl` took a link only — `place` takes any text.
+     the single `transport` type became `train` and `bus`.
+     a flight was an "arrival" or a "departure" at one `location` — it is now
+     one plan from → to, leaving at `time` and landing at `endTime`. */
+export function upgradeItem({ mapsUrl, direction, location, ...item }) {
+  const next = { ...item }
+  if (!next.place && mapsUrl) next.place = mapsUrl
+  if (RENAMED_TYPES[next.type]) next.type = RENAMED_TYPES[next.type]
+  if (next.type === 'flight' && next.from == null && next.to == null && (direction || location)) {
+    const where = str(location)
+    if (direction === 'departure') Object.assign(next, { from: where, to: '' })
+    else Object.assign(next, { from: '', to: where, endTime: str(item.time), time: '' })
+  }
+  return next
+}
+
+function normalizeAttachment(a) {
+  if (!a || typeof a !== 'object' || typeof a.id !== 'string') return null
+  return { id: a.id, name: str(a.name) || 'Document', type: str(a.type), size: num(a.size) ?? 0 }
+}
+
+function normalizeItem(raw) {
+  if (!raw || typeof raw !== 'object') throw new Error('invalid item')
+  const i = upgradeItem(raw)
   const type = str(i.type) || 'other'
+  const attachments = Array.isArray(i.attachments) ? i.attachments.map(normalizeAttachment).filter(Boolean) : []
+  const cost = money(i.cost)
   return {
     id: typeof i.id === 'string' ? i.id : uid(),
-    type: RENAMED_TYPES[type] ?? type,
+    type,
     title: str(i.title),
     time: str(i.time),
-    // `mapsUrl` held a link only; `place` takes any text.
-    place: str(i.place) || str(i.mapsUrl),
+    endTime: str(i.endTime),
+    place: str(i.place),
     notes: str(i.notes),
-    ...(Number.isFinite(+i.cost) && +i.cost > 0 && { cost: Math.round(+i.cost * 100) / 100 }),
+    ...(cost != null && { cost }),
+    ...(cost != null && code(i.currency) && { currency: code(i.currency) }),
+    ...(cost != null && i.paid === true && { paid: true }),
+    ...(cost != null && str(i.paidBy) && { paidBy: str(i.paidBy) }),
     ...(['done', 'skipped'].includes(i.status) && { status: i.status }),
-    ...(type === 'flight' && {
-      flightNo: str(i.flightNo),
-      direction: i.direction === 'departure' ? 'departure' : 'arrival',
-      location: str(i.location),
-    }),
+    ...(type === 'flight' && { flightNo: str(i.flightNo), from: str(i.from), to: str(i.to) }),
     ...(type === 'hotel' && {
       hotelAction: i.hotelAction === 'check-out' ? 'check-out' : 'check-in',
     }),
+    ...(attachments.length > 0 && { attachments }),
   }
 }
 
@@ -81,7 +109,15 @@ function normalizeTrip(t) {
     destination: str(t.destination),
     startDate: str(t.startDate),
     endDate: str(t.endDate),
-    currency: str(t.currency).toUpperCase().slice(0, 3),
+    currency: code(t.currency),
+    timeZone: str(t.timeZone),
+    ...(money(t.budget) != null && { budget: money(t.budget) }),
+    travellers: Array.isArray(t.travellers) ? [...new Set(t.travellers.map(str).map(s => s.trim()).filter(Boolean))] : [],
+    rates: Object.fromEntries(
+      Object.entries(t.rates && typeof t.rates === 'object' ? t.rates : {})
+        .map(([k, v]) => [code(k), num(v)])
+        .filter(([k, v]) => k.length === 3 && v > 0),
+    ),
     createdAt: str(t.createdAt) || now,
     updatedAt: str(t.updatedAt) || now,
     days: Array.isArray(t.days) ? t.days.map(normalizeDay) : [],
@@ -104,4 +140,19 @@ export function parseImport(text) {
     throw new Error('not a valid JSON file')
   }
   return normalizeTrips(data)
+}
+
+/* A copy of a trip that can live next to the original: every trip, day, plan
+   and packing id is new. Documents keep pointing at the same stored files. */
+export function cloneTrip(trip, overrides = {}) {
+  const now = new Date().toISOString()
+  return {
+    ...trip,
+    id: uid(),
+    createdAt: now,
+    updatedAt: now,
+    days: trip.days.map(d => ({ ...d, id: uid(), items: d.items.map(i => ({ ...i, id: uid() })) })),
+    packing: (trip.packing ?? []).map(p => ({ ...p, id: uid() })),
+    ...overrides,
+  }
 }

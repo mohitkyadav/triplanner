@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { readBooking } from '../lib/booking'
-import { catById, titleFor } from '../lib/categories'
+import { catById, flightRoute, titleFor } from '../lib/categories'
 import { fmtDate } from '../lib/dates'
+import { fmtTimes } from '../lib/schedule'
 import {
   btnGhost,
   btnPrimary,
@@ -10,7 +11,6 @@ import {
   IconCircle,
   IconLogIn,
   IconLogOut,
-  IconPlaneLanding,
   IconPlaneTakeoff,
   Modal,
 } from './ui'
@@ -18,17 +18,16 @@ import {
 // Reads a booking file, shows what it found, and adds only what the user ticks.
 // Nothing is saved until then.
 
-const DIRECTION = {
-  arrival: { icon: IconPlaneLanding, label: 'Arrival' },
-  departure: { icon: IconPlaneTakeoff, label: 'Departure' },
-}
 const HOTEL = {
   'check-in': { icon: IconLogIn, label: 'Check-in' },
   'check-out': { icon: IconLogOut, label: 'Check-out' },
 }
 
 function metaFor(item) {
-  if (item.type === 'flight') return DIRECTION[item.direction] ?? DIRECTION.arrival
+  if (item.type === 'flight') {
+    const route = item.title && flightRoute(item)
+    return route ? { icon: IconPlaneTakeoff, label: route } : null
+  }
   if (item.type === 'hotel') return HOTEL[item.hotelAction] ?? HOTEL['check-in']
   return null
 }
@@ -108,7 +107,7 @@ export default function BookingImport({ trip, text, onImport, onClose }) {
                       )}
                       <span className="tabular-nums">
                         {fmtDate(row.date)}
-                        {row.time && ` · ${row.time}`}
+                        {fmtTimes(row.item) && ` · ${fmtTimes(row.item)}`}
                       </span>
                       {/* the title usually names the flight already */}
                       {row.item.flightNo && !row.item.title.includes(row.item.flightNo) && (

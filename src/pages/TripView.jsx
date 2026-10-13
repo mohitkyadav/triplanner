@@ -12,6 +12,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useEffect, useRef, useState } from 'react'
 import AirlineLogo from '../components/AirlineLogo'
 import BookingImport from '../components/BookingImport'
+import BudgetCard from '../components/Budget'
 import DayCard from '../components/DayCard'
 import DayForm from '../components/DayForm'
 import { ItemCardOverlay } from '../components/ItemCard'
@@ -24,12 +25,14 @@ import {
   IconCalendar,
   IconCalendarPlus,
   IconChevronRight,
+  IconCopy,
   IconDownload,
   IconMapPin,
   IconNavigation,
   IconPencil,
   IconPlaneLanding,
   IconPlaneTakeoff,
+  IconRadar,
   IconPlus,
   IconShare,
   IconTicket,
@@ -38,39 +41,29 @@ import {
   iconBtn,
   useToast,
 } from '../components/ui'
-import { airlineFromFlightNo } from '../lib/airlines'
+import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
+import { flightRoute } from '../lib/categories'
 import { addDaysISO, fmtDate, fmtRange, todayISO } from '../lib/dates'
 import { tripToICS } from '../lib/ics'
-import { downloadFile, downloadJSON, exportPayload, slug } from '../lib/io'
+import { takePendingBooking } from '../lib/inbox'
+import { cloneTrip, downloadFile, downloadJSON, exportPayload, slug } from '../lib/io'
 import { fmtMoney, tripCost } from '../lib/money'
-import { makeDay, sortDays, uid, useStore } from '../lib/store'
+import { rescheduleDays } from '../lib/reschedule'
+import { fmtTimes } from '../lib/schedule'
+import { makeDay, placeByTime, sortDays, uid, useStore } from '../lib/store'
 import { computeStays } from '../lib/stays'
+import { useWeather } from '../lib/weather'
 
-// Keeps a day readable: a timed plan lands among the other timed plans, and a
-// plan with no time goes to the end.
-function insertByTime(items, item) {
-  if (!item.time) return [...items, item]
-  const at = items.findIndex(i => !i.time || i.time > item.time)
-  return at < 0 ? [...items, item] : [...items.slice(0, at), item, ...items.slice(at)]
-}
-
-// First arrival flight and last departure flight of the trip, for the banner.
+// The first and the last flight of the trip, for the banner.
 function flightEndpoints(trip) {
-  let arrival = null
-  let departure = null
-  for (const day of trip.days) {
-    for (const item of day.items) {
-      if (item.type !== 'flight') continue
-      if (item.direction === 'departure') departure = { item, day }
-      else if (!arrival) arrival = { item, day }
-    }
-  }
-  return { arrival, departure }
+  const flights = trip.days.flatMap(day => day.items.filter(i => i.type === 'flight').map(item => ({ item, day })))
+  return { outbound: flights[0] ?? null, back: flights.length > 1 ? flights[flights.length - 1] : null }
 }
 
 function FlightRow({ icon: Icon, label, item, day }) {
   const airline = airlineFromFlightNo(item.flightNo)
-  const sub = [airline?.name, fmtDate(day.date), item.time, item.location].filter(Boolean).join(' · ')
+  const tracker = flightTrackerUrl(item.flightNo)
+  const sub = [airline?.name, fmtDate(day.date), fmtTimes(item), flightRoute(item)].filter(Boolean).join(' · ')
   const planeChip = (
     <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
       <Icon className="size-4.5" />
@@ -83,13 +76,25 @@ function FlightRow({ icon: Icon, label, item, day }) {
       ) : (
         planeChip
       )}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold">
           {label}
           {item.flightNo && <span className="font-medium text-slate-500 dark:text-slate-400"> · {item.flightNo}</span>}
         </p>
         {sub && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{sub}</p>}
       </div>
+      {tracker && (
+        <a
+          className={iconBtn}
+          href={tracker}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Track flight ${item.flightNo}`}
+          title="Live flight status"
+        >
+          <IconRadar className="size-4.5" />
+        </a>
+      )}
     </div>
   )
 }
@@ -108,6 +113,8 @@ export default function TripView({ id, navigate }) {
   const dragSnapshot = useRef(null) // days before the drag, restored on cancel
   const icsRef = useRef(null)
 
+  const weather = useWeather(trip)
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -117,10 +124,16 @@ export default function TripView({ id, navigate }) {
     if (!trip) navigate('')
   }, [trip, navigate])
 
+  // A booking shared to the app (Inbox) waits for this trip to open.
+  useEffect(() => {
+    const text = takePendingBooking(id)
+    if (text) setBooking(text)
+  }, [id])
+
   // On opening a trip that spans today, smoothly scroll to the current day.
   useEffect(() => {
     const days = trip?.days ?? []
-    const today = todayISO()
+    const today = todayISO(trip?.timeZone)
     const idx = days.findIndex(d => d.date && d.date >= today)
     if (idx <= 0) return
     const t = setTimeout(() => {
@@ -136,7 +149,7 @@ export default function TripView({ id, navigate }) {
 
   function addDay() {
     const last = trip.days[trip.days.length - 1]
-    const date = last?.date ? addDaysISO(last.date, 1) : trip.startDate || todayISO()
+    const date = last?.date ? addDaysISO(last.date, 1) : trip.startDate || todayISO(trip.timeZone)
     dispatch({ type: 'day/add', tripId: trip.id, day: makeDay(date) })
   }
 
@@ -148,6 +161,32 @@ export default function TripView({ id, navigate }) {
       label: 'Undo',
       onClick: () => dispatch({ type: 'trip/restore', trip, index }),
     })
+  }
+
+  function duplicateTrip() {
+    const copy = cloneTrip(trip, { name: `${trip.name} (copy)` })
+    dispatch({ type: 'trip/create', trip: copy })
+    toast(`Duplicated as “${copy.name}”`)
+    navigate(`/trip/${copy.id}`)
+  }
+
+  /* Saves the trip form. New dates bring the days along (see
+     rescheduleDays); one Undo puts the trip back as it was. */
+  function saveTrip(patch, { mode }) {
+    const before = trip
+    const datesChanged = patch.startDate !== trip.startDate || patch.endDate !== trip.endDate
+    const { days, outside } = datesChanged ? rescheduleDays(trip, patch, mode) : { days: trip.days, outside: 0 }
+    dispatch({ type: 'trip/update', id: trip.id, patch: { ...patch, days } })
+    setEditTrip(false)
+    if (datesChanged) {
+      const undo = { label: 'Undo', onClick: () => dispatch({ type: 'trip/update', id: trip.id, patch: before }) }
+      toast(
+        outside > 0
+          ? `${outside} day${outside === 1 ? '' : 's'} with plans fall outside the dates — kept`
+          : 'Dates updated',
+        undo,
+      )
+    }
   }
 
   function exportTrip() {
@@ -183,35 +222,29 @@ export default function TripView({ id, navigate }) {
         day = makeDay(row.date)
         days = sortDays([...days, day])
       }
-      days = days.map(d => (d.id === day.id ? { ...d, items: insertByTime(d.items, { id: uid(), ...row.item }) } : d))
+      days = days.map(d => (d.id === day.id ? { ...d, items: placeByTime(d.items, { id: uid(), ...row.item }) } : d))
     }
     const dates = rows.map(r => r.date).filter(Boolean)
     const span = [trip.startDate, trip.endDate, ...dates].filter(Boolean).sort()
-    const patch = { startDate: span[0], endDate: span[span.length - 1] }
 
-    dispatch({ type: 'trip/setDays', tripId: trip.id, days })
-    if (patch.startDate !== trip.startDate || patch.endDate !== trip.endDate) {
-      dispatch({ type: 'trip/update', id: trip.id, patch })
-    }
+    dispatch({
+      type: 'trip/update',
+      id: trip.id,
+      patch: { days, startDate: span[0] ?? '', endDate: span[span.length - 1] ?? '' },
+    })
     setBooking(null)
     toast(`Added ${rows.length} plan${rows.length === 1 ? '' : 's'}`, {
       label: 'Undo',
-      onClick: () => {
-        dispatch({ type: 'trip/setDays', tripId: trip.id, days: before.days })
-        dispatch({
-          type: 'trip/update',
-          id: trip.id,
-          patch: { startDate: before.startDate, endDate: before.endDate },
-        })
-      },
+      onClick: () => dispatch({ type: 'trip/update', id: trip.id, patch: before }),
     })
   }
 
-  function saveItem(data) {
-    if (itemModal.item) {
-      dispatch({ type: 'item/update', tripId: trip.id, dayId: itemModal.dayId, itemId: itemModal.item.id, patch: data })
+  function saveItem(data, toDayId) {
+    const { dayId, item } = itemModal
+    if (item) {
+      dispatch({ type: 'item/update', tripId: trip.id, dayId, toDayId, itemId: item.id, patch: data })
     } else {
-      dispatch({ type: 'item/add', tripId: trip.id, dayId: itemModal.dayId, item: { id: uid(), ...data } })
+      dispatch({ type: 'item/add', tripId: trip.id, dayId: toDayId ?? dayId, item: { id: uid(), ...data } })
     }
     setItemModal(null)
   }
@@ -229,9 +262,9 @@ export default function TripView({ id, navigate }) {
 
   const modalDayIndex = itemModal ? trip.days.findIndex(d => d.id === itemModal.dayId) : -1
   const staysByDay = computeStays(trip)
-  const { arrival, departure } = flightEndpoints(trip)
+  const { outbound, back } = flightEndpoints(trip)
   const totalCost = tripCost(trip)
-  const today = todayISO()
+  const today = todayISO(trip.timeZone)
   const todayIndex = trip.days.findIndex(d => d.date === today)
 
   const dayOfItem = itemId => trip.days.find(d => d.items.some(i => i.id === itemId))
@@ -305,6 +338,7 @@ export default function TripView({ id, navigate }) {
               { label: 'Import booking (.ics)', icon: IconTicket, onClick: () => icsRef.current?.click() },
               { label: 'Export to calendar (.ics)', icon: IconCalendarPlus, onClick: exportCalendar },
               { label: 'Export as JSON', icon: IconDownload, onClick: exportTrip },
+              { label: 'Duplicate trip', icon: IconCopy, onClick: duplicateTrip },
               { label: 'Delete trip', icon: IconTrash, onClick: deleteTrip, danger: true },
             ]}
           />
@@ -333,12 +367,15 @@ export default function TripView({ id, navigate }) {
                 .join(' · ')}
             </p>
           </div>
-          {(arrival || departure) && (
+          {outbound && (
             <div className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
-              {arrival && <FlightRow icon={IconPlaneLanding} label="Arrival" item={arrival.item} day={arrival.day} />}
-              {departure && (
-                <FlightRow icon={IconPlaneTakeoff} label="Departure" item={departure.item} day={departure.day} />
-              )}
+              <FlightRow
+                icon={IconPlaneTakeoff}
+                label={back ? 'Outbound' : 'Flight'}
+                item={outbound.item}
+                day={outbound.day}
+              />
+              {back && <FlightRow icon={IconPlaneLanding} label="Return" item={back.item} day={back.day} />}
             </div>
           )}
           {todayIndex >= 0 && (
@@ -361,6 +398,7 @@ export default function TripView({ id, navigate }) {
         </div>
 
         <PackingList trip={trip} />
+        <BudgetCard trip={trip} />
 
         <DndContext
           sensors={sensors}
@@ -378,6 +416,7 @@ export default function TripView({ id, navigate }) {
               day={day}
               index={i}
               stays={staysByDay[day.id]}
+              weather={weather?.[day.date]}
               isPast={Boolean(day.date) && day.date < today}
               isToday={day.date === today}
               onEditDay={() => setDayModal({ day, index: i })}
@@ -403,6 +442,8 @@ export default function TripView({ id, navigate }) {
           initial={itemModal.item}
           dayLabel={`day ${modalDayIndex + 1}`}
           trip={trip}
+          days={trip.days}
+          dayId={itemModal.dayId}
           onSave={saveItem}
           onDelete={deleteItem}
           onClose={() => setItemModal(null)}
@@ -431,14 +472,7 @@ export default function TripView({ id, navigate }) {
         />
       )}
       {editTrip && (
-        <TripForm
-          initial={trip}
-          onSave={patch => {
-            dispatch({ type: 'trip/update', id: trip.id, patch })
-            setEditTrip(false)
-          }}
-          onClose={() => setEditTrip(false)}
-        />
+        <TripForm initial={trip} onSave={saveTrip} onClose={() => setEditTrip(false)} />
       )}
     </div>
   )

@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { airlineFromFlightNo } from '../lib/airlines'
 import { CATEGORIES } from '../lib/categories'
+import { fmtDate } from '../lib/dates'
 import { placeLinks } from '../lib/maps'
 import AirlineLogo from './AirlineLogo'
+import { DocumentList } from './Documents'
 import {
   btnDanger,
   btnGhost,
@@ -12,13 +14,12 @@ import {
   IconCircle,
   IconLogIn,
   IconLogOut,
-  IconPlaneLanding,
-  IconPlaneTakeoff,
   IconXCircle,
   inputCls,
   Modal,
   PickerInput,
   Segmented,
+  useToast,
 } from './ui'
 
 const NOTE_HINTS = {
@@ -29,74 +30,139 @@ const NOTE_HINTS = {
   work: 'Meetings, calls, focus blocks…',
 }
 
-export default function ItemForm({ initial, dayLabel, trip, onSave, onDelete, onClose }) {
+const dayName = (day, i) => [`Day ${i + 1}`, day.date && fmtDate(day.date), day.title].filter(Boolean).join(' · ')
+
+/* onSave(item, toDayId) — `toDayId` is the day the plan belongs on, which the
+   form lets the user change ("Move to day…") when `days` is given. */
+export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave, onDelete, onClose }) {
+  const toast = useToast()
   const editing = Boolean(initial?.id)
   const [type, setType] = useState(initial?.type ?? 'landmark')
   const [status, setStatus] = useState(initial?.status ?? 'planned')
+  const [targetDay, setTargetDay] = useState(dayId)
+  const [docs, setDocs] = useState(initial?.attachments ?? [])
   const [f, setF] = useState({
     title: initial?.title ?? '',
     time: initial?.time ?? '',
+    endTime: initial?.endTime ?? '',
     cost: initial?.cost != null ? String(initial.cost) : '',
+    currency: initial?.currency ?? '',
+    paid: Boolean(initial?.paid),
+    paidBy: initial?.paidBy ?? '',
     place: initial?.place ?? '',
     notes: initial?.notes ?? '',
     flightNo: initial?.flightNo ?? '',
-    direction: initial?.direction ?? 'arrival',
-    location: initial?.location ?? '',
+    from: initial?.from ?? '',
+    to: initial?.to ?? '',
     hotelAction: initial?.hotelAction === 'check-out' ? 'check-out' : 'check-in',
   })
-  const set = k => e => setF(prev => ({ ...prev, [k]: e.target.value }))
+  const set = k => e => setF(prev => ({ ...prev, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
+
+  const travellers = trip?.travellers ?? []
 
   function submit(e) {
     e.preventDefault()
     const cost = parseFloat(f.cost.replace(',', '.'))
+    const hasCost = Number.isFinite(cost) && cost > 0
+    const currency = f.currency.trim().toUpperCase()
     const item = {
       type,
       title: f.title.trim(),
       time: f.time,
-      cost: Number.isFinite(cost) && cost > 0 ? Math.round(cost * 100) / 100 : undefined,
+      endTime: type === 'hotel' ? '' : f.endTime,
+      cost: hasCost ? Math.round(cost * 100) / 100 : undefined,
+      currency: hasCost && currency && currency !== trip?.currency ? currency : undefined,
+      paid: hasCost && f.paid ? true : undefined,
+      paidBy: hasCost && travellers.includes(f.paidBy) ? f.paidBy : undefined,
       place: f.place.trim(),
-      mapsUrl: undefined, // the old link-only field, dropped on the next save
       notes: f.notes.trim(),
       status: status === 'planned' ? undefined : status,
+      attachments: docs.length ? docs : undefined,
+      // fields an older version wrote, dropped on the next save
+      mapsUrl: undefined,
+      direction: undefined,
+      location: undefined,
     }
     if (type === 'flight') {
       item.flightNo = f.flightNo.trim()
-      item.direction = f.direction
-      item.location = f.location.trim()
+      item.from = f.from.trim()
+      item.to = f.to.trim()
     }
     if (type === 'hotel') item.hotelAction = f.hotelAction
-    onSave(item)
+    onSave(item, targetDay)
   }
 
-  const titleLabel =
-    type === 'flight' ? 'Label (optional)' : type === 'hotel' ? 'Hotel name' : 'Name'
+  const titleLabel = type === 'flight' ? 'Label (optional)' : type === 'hotel' ? 'Hotel name' : 'Name'
   const titlePlaceholder =
-    type === 'flight' ? 'e.g. Berlin → Lisbon' : type === 'hotel' ? 'e.g. Hotel Alfama' : 'e.g. Louvre Museum'
+    type === 'flight' ? 'e.g. Off to Lisbon' : type === 'hotel' ? 'e.g. Hotel Alfama' : 'e.g. Louvre Museum'
   const airline = type === 'flight' ? airlineFromFlightNo(f.flightNo) : null
-  const costLabel = trip?.currency ? `Cost (${trip.currency})` : 'Cost (optional)'
   // What the map buttons will do, shown live under the field.
-  const mapHint =
-    placeLinks(trip, { type, title: f.title, location: f.location, place: f.place }) ?? {}
-  const costInput = (
-    <input
-      className={inputCls}
-      value={f.cost}
-      onChange={set('cost')}
-      placeholder="0"
-      inputMode="decimal"
-      pattern="[0-9]*[.,]?[0-9]*"
-    />
-  )
+  const mapHint = placeLinks(trip, { type, title: f.title, from: f.from, to: f.to, place: f.place }) ?? {}
+  const otherDays = days && days.length > 1
 
+  const costFields = (
+    <div className="space-y-3">
+      <div className="grid grid-cols-[1fr_5.5rem] gap-3">
+        <Field label="Cost (optional)">
+          <input
+            className={inputCls}
+            value={f.cost}
+            onChange={set('cost')}
+            placeholder="0"
+            inputMode="decimal"
+            pattern="[0-9]*[.,]?[0-9]*"
+          />
+        </Field>
+        <Field label="Currency">
+          <input
+            className={`${inputCls} uppercase`}
+            value={f.currency}
+            onChange={set('currency')}
+            placeholder={trip?.currency || 'EUR'}
+            maxLength={3}
+            autoCapitalize="characters"
+            aria-label="Cost currency"
+          />
+        </Field>
+      </div>
+      {f.cost && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+            <input type="checkbox" checked={f.paid} onChange={set('paid')} className="size-4 accent-brand-600" />
+            Already paid
+          </label>
+          {travellers.length > 0 && (
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+              Paid by
+              <select
+                className="rounded-lg bg-slate-100 px-2 py-1 text-sm dark:bg-slate-800"
+                value={f.paidBy}
+                onChange={set('paidBy')}
+              >
+                <option value="">Nobody yet</option>
+                {travellers.map(t => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <Modal title={editing ? 'Edit plan' : `Add to ${dayLabel}`} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Kind of plan">
           {CATEGORIES.map(c => (
             <button
               type="button"
               key={c.id}
+              role="radio"
+              aria-checked={type === c.id}
               onClick={() => setType(c.id)}
               className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-center transition ${
                 type === c.id
@@ -112,24 +178,11 @@ export default function ItemForm({ initial, dayLabel, trip, onSave, onDelete, on
 
         {type === 'flight' && (
           <>
-            <Segmented
-              value={f.direction}
-              onChange={v => setF(prev => ({ ...prev, direction: v }))}
-              options={[
-                { value: 'arrival', label: 'Arrival', icon: IconPlaneLanding },
-                { value: 'departure', label: 'Departure', icon: IconPlaneTakeoff },
-              ]}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Flight number">
-                <input className={inputCls} value={f.flightNo} onChange={set('flightNo')} placeholder="LH 1178" />
-              </Field>
-              <Field label={f.direction === 'arrival' ? 'Arrival time' : 'Departure time'}>
-                <PickerInput type="time" value={f.time} onChange={set('time')} />
-              </Field>
-            </div>
+            <Field label="Flight number">
+              <input className={inputCls} value={f.flightNo} onChange={set('flightNo')} placeholder="LH 1178" />
+            </Field>
             {airline && (
-              <div className="flex items-center gap-2 text-[13px] font-medium text-slate-500 dark:text-slate-400">
+              <div className="-mt-2 flex items-center gap-2 text-[13px] font-medium text-slate-500 dark:text-slate-400">
                 <AirlineLogo
                   iata={airline.iata}
                   name={airline.name}
@@ -140,10 +193,18 @@ export default function ItemForm({ initial, dayLabel, trip, onSave, onDelete, on
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Airport / location">
-                <input className={inputCls} value={f.location} onChange={set('location')} placeholder="Lisbon LIS" />
+              <Field label="From">
+                <input className={inputCls} value={f.from} onChange={set('from')} placeholder="Berlin BER" />
               </Field>
-              <Field label={costLabel}>{costInput}</Field>
+              <Field label="To">
+                <input className={inputCls} value={f.to} onChange={set('to')} placeholder="Lisbon LIS" />
+              </Field>
+              <Field label="Departs">
+                <PickerInput type="time" value={f.time} onChange={set('time')} />
+              </Field>
+              <Field label="Arrives">
+                <PickerInput type="time" value={f.endTime} onChange={set('endTime')} />
+              </Field>
             </div>
           </>
         )}
@@ -170,14 +231,35 @@ export default function ItemForm({ initial, dayLabel, trip, onSave, onDelete, on
           />
         </Field>
 
-        {type !== 'flight' && (
+        {type === 'hotel' && (
+          <Field label="Time (optional)">
+            <PickerInput type="time" value={f.time} onChange={set('time')} />
+          </Field>
+        )}
+        {type !== 'flight' && type !== 'hotel' && (
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Time (optional)">
+            <Field label="Starts (optional)">
               <PickerInput type="time" value={f.time} onChange={set('time')} />
             </Field>
-            <Field label={costLabel}>{costInput}</Field>
+            <Field label="Ends (optional)">
+              <PickerInput type="time" value={f.endTime} onChange={set('endTime')} />
+            </Field>
           </div>
         )}
+
+        {otherDays && (
+          <Field label={editing ? 'Day (change it to move the plan)' : 'Day'}>
+            <select className={inputCls} value={targetDay} onChange={e => setTargetDay(e.target.value)}>
+              {days.map((d, i) => (
+                <option key={d.id} value={d.id}>
+                  {dayName(d, i)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        {costFields}
 
         <Field label="Map (optional)">
           <input
@@ -203,6 +285,11 @@ export default function ItemForm({ initial, dayLabel, trip, onSave, onDelete, on
             placeholder={NOTE_HINTS[type] ?? 'Tickets, tips, what to look for…'}
           />
         </Field>
+
+        <div>
+          <span className="mb-1.5 block text-[13px] font-medium text-slate-500 dark:text-slate-400">Documents</span>
+          <DocumentList docs={docs} onChange={setDocs} onError={toast} />
+        </div>
 
         {editing && (
           <Field label="Status">

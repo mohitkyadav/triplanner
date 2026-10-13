@@ -1,16 +1,31 @@
+import { useState } from 'react'
 import { fmtRange } from '../lib/dates'
+import { cloneTrip } from '../lib/io'
 import { useStore } from '../lib/store'
-import { btnGhost, btnPrimary, IconCalendar, IconMapPin } from './ui'
+import { btnGhost, btnPrimary, IconCalendar, IconMapPin, Segmented } from './ui'
 
-// Summary + confirm step before shared trips are added to the store.
-export default function ImportPreview({ trips, onConfirm, onCancel }) {
+/* Summary + confirm step before trips are added to the store. A trip this
+   device already holds can replace the copy here, or sit next to it as a
+   separate trip — so a trip passed back and forth never silently overwrites
+   your own edits. onConfirm gets the trips to add. */
+export default function ImportPreview({ trips, onConfirm, onCancel, defaultChoice = 'keep' }) {
   const { state } = useStore()
-  const existing = new Set(state.trips.map(t => t.id))
+  const existing = new Map(state.trips.map(t => [t.id, t]))
+  const [choice, setChoice] = useState(() => Object.fromEntries(trips.map(t => [t.id, defaultChoice])))
+
+  function confirm() {
+    onConfirm(
+      trips.map(t =>
+        existing.has(t.id) && choice[t.id] === 'keep' ? cloneTrip(t, { name: `${t.name} (copy)` }) : t,
+      ),
+    )
+  }
 
   return (
     <div className="space-y-4 pb-1">
       {trips.map(trip => {
         const stops = trip.days.reduce((n, d) => n + d.items.length, 0)
+        const mine = existing.get(trip.id)
         return (
           <div
             key={trip.id}
@@ -33,10 +48,20 @@ export default function ImportPreview({ trips, onConfirm, onCancel }) {
                 .filter(Boolean)
                 .join(' · ')}
             </p>
-            {existing.has(trip.id) && (
-              <p className="mt-2 text-[13px] font-medium text-amber-600 dark:text-amber-400">
-                You already have this trip — adding it updates your copy.
-              </p>
+            {mine && (
+              <div className="mt-3 space-y-2">
+                <p className="text-[13px] font-medium text-amber-600 dark:text-amber-400">
+                  You already have this trip{mine.name !== trip.name ? ` as “${mine.name}”` : ''}.
+                </p>
+                <Segmented
+                  value={choice[trip.id]}
+                  onChange={v => setChoice(prev => ({ ...prev, [trip.id]: v }))}
+                  options={[
+                    { value: 'keep', label: 'Keep both' },
+                    { value: 'replace', label: 'Replace mine' },
+                  ]}
+                />
+              </div>
             )}
           </div>
         )
@@ -48,7 +73,7 @@ export default function ImportPreview({ trips, onConfirm, onCancel }) {
         <button className={btnGhost} onClick={onCancel}>
           Cancel
         </button>
-        <button className={btnPrimary} onClick={onConfirm}>
+        <button className={btnPrimary} onClick={confirm}>
           {trips.length === 1 ? 'Add trip' : `Add ${trips.length} trips`}
         </button>
       </div>

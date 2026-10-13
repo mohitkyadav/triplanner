@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { encodeTripShare, qrFrames, shareUrl } from '../lib/share'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { encodeTripShare, qrFrames, shareUrl, tripForShare } from '../lib/share'
 import { btnGhost, btnPrimary, IconCopy, IconShare, Modal, useToast } from './ui'
 
 // Shows a QR code plus a copyable link for one trip. Small trips fit one QR
@@ -11,19 +11,25 @@ export default function ShareModal({ trip, onClose }) {
   const [share, setShare] = useState(null) // { url, frames }
   const [error, setError] = useState(null)
   const [frame, setFrame] = useState(0)
+  const [costs, setCosts] = useState(true)
+  const [notes, setNotes] = useState(true)
   const canvasRef = useRef(null)
+  const hasCosts = trip.budget != null || trip.days.some(d => d.items.some(i => Number.isFinite(i.cost)))
+  const hasNotes = trip.days.some(d => d.items.some(i => i.notes))
+  const hasDocs = trip.days.some(d => d.items.some(i => i.attachments?.length))
 
   useEffect(() => {
     let alive = true
-    encodeTripShare(trip)
+    setFrame(0)
+    encodeTripShare(tripForShare(trip, { costs, notes }))
       .then(payload => alive && setShare({ url: shareUrl(payload), frames: qrFrames(payload) }))
       .catch(() => alive && setError('The share data could not be prepared.'))
     return () => {
       alive = false
     }
-  }, [trip])
+  }, [trip, costs, notes])
 
-  const frames = share?.frames ?? []
+  const frames = useMemo(() => share?.frames ?? [], [share])
   const animated = frames.length > 1
 
   useEffect(() => {
@@ -107,8 +113,36 @@ export default function ShareModal({ trip, onClose }) {
             )}
           </div>
 
+          {(hasCosts || hasNotes) && (
+            <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+              {hasCosts && (
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={costs}
+                    onChange={e => setCosts(e.target.checked)}
+                    className="size-4 accent-brand-600"
+                  />
+                  Include costs
+                </label>
+              )}
+              {hasNotes && (
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={notes}
+                    onChange={e => setNotes(e.target.checked)}
+                    className="size-4 accent-brand-600"
+                  />
+                  Include notes
+                </label>
+              )}
+            </div>
+          )}
+
           <p className="text-center text-xs text-slate-400 dark:text-slate-500">
             The whole trip travels inside the link itself — nothing is uploaded to a server.
+            {hasDocs && ' Documents stay on this device.'}
           </p>
         </div>
       )}

@@ -22,10 +22,10 @@ export default function ShareReceive({ payload, navigate }) {
     }
   }, [payload])
 
-  function confirm() {
-    dispatch({ type: 'data/import', trips })
-    toast(`Added “${trips[0].name}”`)
-    navigate(`/trip/${trips[0].id}`)
+  function confirm(chosen) {
+    dispatch({ type: 'data/import', trips: chosen })
+    toast(`Added “${chosen[0].name}”`)
+    navigate(`/trip/${chosen[0].id}`)
   }
 
   return (

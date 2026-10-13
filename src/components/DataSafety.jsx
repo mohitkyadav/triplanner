@@ -12,6 +12,7 @@ import {
   writeBackupFile,
 } from '../lib/backup'
 import { daysSince, fmtAgo } from '../lib/dates'
+import { fmtBytes } from '../lib/files'
 import { normalizeTrips } from '../lib/io'
 import { useInstall } from '../lib/install'
 import { useStore } from '../lib/store'
@@ -41,18 +42,6 @@ const TONE = {
   warn: { chip: 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300', text: 'text-amber-700 dark:text-amber-400' },
   risk: { chip: 'bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300', text: 'text-rose-600 dark:text-rose-400' },
   idle: { chip: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', text: '' },
-}
-
-function fmtBytes(n) {
-  if (!Number.isFinite(n)) return ''
-  const units = ['B', 'kB', 'MB', 'GB']
-  let value = n
-  let i = 0
-  while (value >= 1000 && i < units.length - 1) {
-    value /= 1000
-    i++
-  }
-  return `${value < 10 && i > 0 ? value.toFixed(1) : Math.round(value)} ${units[i]}`
 }
 
 function status(info, trips) {
@@ -136,9 +125,9 @@ export default function DataSafety({ onExport, onImport }) {
     }
   }
 
-  function confirmRestore() {
-    dispatch({ type: 'data/import', trips: restore.trips })
-    toast(`Restored ${restore.trips.length} trip${restore.trips.length === 1 ? '' : 's'}`)
+  function confirmRestore(trips) {
+    dispatch({ type: 'data/import', trips })
+    toast(`Restored ${trips.length} trip${trips.length === 1 ? '' : 's'}`)
     setRestore(null)
   }
 
@@ -290,9 +279,14 @@ export default function DataSafety({ onExport, onImport }) {
           ) : (
             <>
               <p className="mb-4 text-[13px] text-slate-500 dark:text-slate-400">
-                This copy was saved {fmtAgo(restore.savedAt)}. A trip you already have is replaced by the copy.
+                This copy was saved {fmtAgo(restore.savedAt)}. For a trip you already have, choose whether the copy replaces it.
               </p>
-              <ImportPreview trips={restore.trips} onConfirm={confirmRestore} onCancel={() => setRestore(null)} />
+              <ImportPreview
+                trips={restore.trips}
+                defaultChoice="replace"
+                onConfirm={confirmRestore}
+                onCancel={() => setRestore(null)}
+              />
             </>
           )}
         </Modal>

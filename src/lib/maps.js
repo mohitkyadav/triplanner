@@ -39,12 +39,23 @@ const providerOf = url => {
   return 'other'
 }
 
-// What to search for: the plan's own text, else its name (an airport for a
-// flight), with the trip destination added when the text does not name it.
-export function placeQuery(trip, item) {
+// A bare airport code searches badly on its own; "LIS airport" finds it.
+const airport = text => (/^[A-Z]{3}$/.test(text) ? `${text} airport` : text)
+
+/* What to search for: the plan's own text, else its name, with the trip
+   destination added when the text does not name it. A flight is an airport:
+   the one it leaves from when you are on your way to it (`role` 'arrive'),
+   the one it lands at when you move on from it (`role` 'leave'). Airports
+   carry no destination — the flight may well leave from home. */
+export function placeQuery(trip, item, role = 'arrive') {
   const own = asUrl(item?.place) ? '' : String(item?.place ?? '').trim()
-  const fallback = (item?.type === 'flight' ? item.location : item?.title) || ''
-  const q = (own || fallback).trim()
+  if (item?.type === 'flight') {
+    const from = (item.from ?? '').trim()
+    const to = (item.to ?? '').trim()
+    const q = own || (role === 'leave' ? to || from : from || to)
+    return q ? airport(q) : null
+  }
+  const q = (own || item?.title || '').trim()
   if (!q) return null
   const dest = (trip?.destination || '').trim()
   return dest && !q.toLowerCase().includes(dest.toLowerCase()) ? `${q}, ${dest}` : q
@@ -74,8 +85,8 @@ export function placeUrl(trip, item) {
 // Directions from one stop to the next. Maps then gives the real travel time,
 // which the app cannot calculate without coordinates.
 export function pairRouteUrl(trip, from, to) {
-  const a = placeQuery(trip, from)
-  const b = placeQuery(trip, to)
+  const a = placeQuery(trip, from, 'leave')
+  const b = placeQuery(trip, to, 'arrive')
   if (!a || !b || a === b) return null
   return `https://www.google.com/maps/dir/${encodeURIComponent(a)}/${encodeURIComponent(b)}`
 }

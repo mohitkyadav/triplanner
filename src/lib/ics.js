@@ -1,12 +1,17 @@
-import { catById, titleFor } from './categories'
+import { catById, flightRoute, titleFor } from './categories'
 import { addDaysISO } from './dates'
 import { placeUrl } from './maps'
-import { fmtClock, toMinutes } from './schedule'
+import { endOf, fmtClock, startOf } from './schedule'
 
-// iCalendar (RFC 5545) export. A plan keeps no length, but a calendar event
-// needs an end, so a timed plan becomes a 1-hour block in floating local time
-// (no timezone suffix), which calendar apps show at the trip's wall-clock time.
+// iCalendar (RFC 5545) export, in floating local time (no timezone suffix),
+// which calendar apps show at the trip's wall-clock time. A plan with an end
+// time keeps it; one without becomes a 1-hour block, because a calendar event
+// needs an end. Every timed plan carries a reminder — flights three hours
+// ahead, the rest half an hour — so the phone does the reminding.
 // The trip itself becomes one all-day banner event.
+
+const REMINDER = { flight: '-PT3H' }
+const DEFAULT_REMINDER = '-PT30M'
 
 const esc = s =>
   String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
@@ -28,9 +33,12 @@ const dateBasic = iso => iso.replaceAll('-', '')
 const timeBasic = min => `${fmtClock(min).replace(':', '')}00`
 const dtstamp = () => new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
 
-function vevent(fields) {
+function vevent(fields, alarm) {
   const lines = ['BEGIN:VEVENT']
   for (const [k, v] of fields) if (v) lines.push(fold(`${k}:${v}`))
+  if (alarm) {
+    lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', fold(`DESCRIPTION:${alarm.text}`), `TRIGGER:${alarm.trigger}`, 'END:VALARM')
+  }
   lines.push('END:VEVENT')
   return lines
 }
@@ -64,24 +72,28 @@ export function tripToICS(trip) {
     if (!day.date) continue
     for (const item of day.items) {
       if (item.status === 'skipped') continue
-      const startMin = toMinutes(item.time)
+      const startMin = startOf(item)
       if (startMin == null) continue
-      const endMin = startMin + 60
+      const endMin = endOf(item) ?? startMin + 60
       const start = `${dateBasic(day.date)}T${timeBasic(startMin)}`
       // A plan can run past midnight, so the end may land on the next day.
       const end = `${dateBasic(addDaysISO(day.date, Math.floor(endMin / 1440)))}T${timeBasic(endMin)}`
+      const summary = esc(`${catById(item.type).emoji} ${titleFor(item)}`)
       lines.push(
-        ...vevent([
-          ['UID', `${item.id}@triplanner`],
-          ['DTSTAMP', stamp],
-          ['DTSTART', start],
-          ['DTEND', end],
-          ['SUMMARY', esc(`${catById(item.type).emoji} ${titleFor(item)}`)],
-          ['LOCATION', esc(item.location || (item.type !== 'flight' && item.title) || '')],
-          ['DESCRIPTION', item.notes && esc(item.notes)],
-          // `place` can hold plain text, but URL: must be a real URL.
-          ['URL', esc(placeUrl(trip, item) || '')],
-        ]),
+        ...vevent(
+          [
+            ['UID', `${item.id}@triplanner`],
+            ['DTSTAMP', stamp],
+            ['DTSTART', start],
+            ['DTEND', end],
+            ['SUMMARY', summary],
+            ['LOCATION', esc((item.type === 'flight' ? flightRoute(item) : item.title) || '')],
+            ['DESCRIPTION', item.notes && esc(item.notes)],
+            // `place` can hold plain text, but URL: must be a real URL.
+            ['URL', esc(placeUrl(trip, item) || '')],
+          ],
+          { text: summary, trigger: REMINDER[item.type] ?? DEFAULT_REMINDER },
+        ),
       )
     }
   }

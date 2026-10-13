@@ -24,6 +24,23 @@ const b64uDecode = s =>
 const pipe = async (bytes, stream) =>
   new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer())
 
+/* The trip as the other person gets it. Documents never travel — they are
+   files on this device. `costs: false` leaves out every amount and the
+   budget; `notes: false` leaves out the notes on plans. */
+export function tripForShare(trip, { costs = true, notes = true } = {}) {
+  const strip = ({ attachments, cost, currency, paid, paidBy, ...item }) => ({
+    ...item,
+    ...(costs && { cost, currency, paid, paidBy }),
+    ...(!notes && { notes: '' }),
+  })
+  const { budget, rates, travellers, ...rest } = trip
+  return {
+    ...rest,
+    ...(costs && { budget, rates, travellers }),
+    days: trip.days.map(d => ({ ...d, items: d.items.map(strip) })),
+  }
+}
+
 export async function encodeTripShare(trip) {
   const bytes = new TextEncoder().encode(JSON.stringify({ app: 'triplanner', version: 1, trips: [trip] }))
   if (typeof CompressionStream === 'function') {

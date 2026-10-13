@@ -4,10 +4,22 @@ import { fmtDate } from '../lib/dates'
 import { dayRouteUrl } from '../lib/maps'
 import { dayCost, fmtMoney } from '../lib/money'
 import { useStore } from '../lib/store'
+import WeatherChip from './WeatherChip'
 import ItemCard from './ItemCard'
 import { IconBed, IconPencil, IconPlus, IconRoute, IconTrash, iconBtn, useToast } from './ui'
 
-export default function DayCard({ trip, day, index, stays = [], isPast, isToday, onEditDay, onAddItem, onEditItem }) {
+export default function DayCard({
+  trip,
+  day,
+  index,
+  stays = [],
+  weather,
+  isPast,
+  isToday,
+  onEditDay,
+  onAddItem,
+  onEditItem,
+}) {
   const { dispatch } = useStore()
   const toast = useToast()
   // Makes the whole day a drop target so items can be dragged into empty days.
@@ -25,7 +37,7 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
     })
   }
 
-  const cost = dayCost(day)
+  const cost = dayCost(trip, day)
   const routeUrl = dayRouteUrl(trip, day)
 
   return (
@@ -34,21 +46,24 @@ export default function DayCard({ trip, day, index, stays = [], isPast, isToday,
       className={`scroll-mt-18 transition-opacity duration-300 ${isPast ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''}`}
     >
       <div className="mb-2.5 flex items-center gap-2 px-1">
-        <h2 className="text-lg font-bold">Day {index + 1}</h2>
+        <h2 className="shrink-0 whitespace-nowrap text-lg font-bold">Day {index + 1}</h2>
         {day.date && (
-          <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{fmtDate(day.date)}</span>
+          <span className="shrink-0 whitespace-nowrap text-sm font-medium text-slate-500 dark:text-slate-400">
+            {fmtDate(day.date)}
+          </span>
         )}
         {isToday && (
-          <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold tracking-wide text-brand">
+          <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold tracking-wide text-brand">
             Today
           </span>
         )}
         {day.title && (
           <span className="min-w-0 truncate text-sm text-slate-400 dark:text-slate-500">· {day.title}</span>
         )}
-        <span className="flex-1" />
+        <span className="min-w-0 flex-1" />
+        <WeatherChip day={weather} />
         {cost > 0 && (
-          <span className="text-xs font-semibold tabular-nums text-slate-400 dark:text-slate-500">
+          <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-400 dark:text-slate-500">
             {fmtMoney(cost, trip.currency)}
           </span>
         )}
