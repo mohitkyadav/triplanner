@@ -27,13 +27,16 @@ export default function TripForm({ initial, onSave, onClose }) {
       ...prev,
       startDate: value,
       endDate:
-        value && prev.startDate && prev.endDate ? addDaysISO(prev.endDate, daysBetween(prev.startDate, value)) : prev.endDate,
+        value && prev.startDate && prev.endDate
+          ? addDaysISO(prev.endDate, daysBetween(prev.startDate, value))
+          : prev.endDate,
     }))
   }
   const zones = useMemo(timeZones, [])
   const device = deviceTimeZone()
 
-  const ordered = f.startDate && f.endDate && f.endDate < f.startDate ? [f.endDate, f.startDate] : [f.startDate, f.endDate]
+  const ordered =
+    f.startDate && f.endDate && f.endDate < f.startDate ? [f.endDate, f.startDate] : [f.startDate, f.endDate]
   const shift = editing && initial.startDate && ordered[0] ? daysBetween(initial.startDate, ordered[0]) : 0
   const hasPlans = editing && initial.days.some(d => d.date && d.items.length > 0)
   const datesChanged = editing && (ordered[0] !== initial.startDate || ordered[1] !== initial.endDate)

@@ -33,15 +33,19 @@ export function DocumentViewer({ doc, onClose }) {
         <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Opening…</p>
       ) : state.status === 'missing' ? (
         <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-          This document is not on this device. Documents stay where they were added — they do not travel in backups
-          or share links.
+          This document is not on this device. Documents stay where they were added — they do not travel in backups or
+          share links.
         </p>
       ) : (
         <div className="space-y-3 pb-1">
           {isImage ? (
             <img src={state.url} alt={doc.name} className="mx-auto max-h-[65dvh] rounded-xl object-contain" />
           ) : isPdf ? (
-            <iframe src={state.url} title={doc.name} className="h-[65dvh] w-full rounded-xl bg-white ring-1 ring-slate-200" />
+            <iframe
+              src={state.url}
+              title={doc.name}
+              className="h-[65dvh] w-full rounded-xl bg-white ring-1 ring-slate-200"
+            />
           ) : (
             <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
               This kind of file cannot be shown here. Open or save it instead.
@@ -91,7 +95,10 @@ export function DocumentList({ docs, onChange, onError }) {
       {docs.length > 0 && (
         <ul className="space-y-1.5">
           {docs.map(doc => (
-            <li key={doc.id} className="flex items-center gap-2 rounded-xl bg-slate-100 py-1 pl-3 pr-1 dark:bg-slate-800">
+            <li
+              key={doc.id}
+              className="flex items-center gap-2 rounded-xl bg-slate-100 py-1 pl-3 pr-1 dark:bg-slate-800"
+            >
               <IconFile className="size-4 shrink-0 text-slate-400" />
               <button
                 type="button"

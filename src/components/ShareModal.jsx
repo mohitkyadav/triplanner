@@ -89,8 +89,8 @@ export default function ShareModal({ trip, onClose }) {
                   Part {(frame % frames.length) + 1} / {frames.length}
                 </span>
                 <p className="max-w-sm text-center text-[13px] text-slate-500 dark:text-slate-400">
-                  This trip is too big for one QR code, so the code animates. On the other phone, open
-                  Triplanner, tap the scan button, and hold the camera here until all parts arrive.
+                  This trip is too big for one QR code, so the code animates. On the other phone, open Triplanner, tap
+                  the scan button, and hold the camera here until all parts arrive.
                 </p>
               </>
             ) : (

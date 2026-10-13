@@ -17,7 +17,10 @@ self.addEventListener('fetch', event => {
             cache.put(
               `/inbox/${Date.now()}-${i}`,
               new Response(file, {
-                headers: { 'content-type': file.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name) },
+                headers: {
+                  'content-type': file.type || 'application/octet-stream',
+                  'x-file-name': encodeURIComponent(file.name),
+                },
               }),
             ),
           ),

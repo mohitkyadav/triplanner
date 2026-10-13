@@ -24,7 +24,10 @@ export function zonedNow(timeZone = '') {
           .formatToParts(d)
           .map(p => [p.type, p.value]),
       )
-      return { today: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) * 60 + Number(parts.minute) }
+      return {
+        today: `${parts.year}-${parts.month}-${parts.day}`,
+        minutes: Number(parts.hour) * 60 + Number(parts.minute),
+      }
     } catch {
       // an unknown zone — fall back to the device clock
     }

@@ -285,7 +285,14 @@ export default function TripView({ id, navigate }) {
     const activeTop = active.rect.current.translated?.top ?? 0
     const isBelow = overIndex >= 0 && activeTop > over.rect.top + over.rect.height / 2
     const toIndex = overIndex >= 0 ? overIndex + (isBelow ? 1 : 0) : toDay.items.length
-    dispatch({ type: 'item/transfer', tripId: trip.id, fromDayId: fromDay.id, toDayId: toDay.id, itemId: active.id, toIndex })
+    dispatch({
+      type: 'item/transfer',
+      tripId: trip.id,
+      fromDayId: fromDay.id,
+      toDayId: toDay.id,
+      itemId: active.id,
+      toIndex,
+    })
   }
 
   function handleDragEnd({ active, over }) {
@@ -434,7 +441,6 @@ export default function TripView({ id, navigate }) {
           <IconPlus className="size-5" />
           Add day {trip.days.length + 1}
         </button>
-
       </main>
 
       {itemModal && (
@@ -449,13 +455,7 @@ export default function TripView({ id, navigate }) {
           onClose={() => setItemModal(null)}
         />
       )}
-      <input
-        ref={icsRef}
-        type="file"
-        accept=".ics,text/calendar"
-        hidden
-        onChange={readBookingFile}
-      />
+      <input ref={icsRef} type="file" accept=".ics,text/calendar" hidden onChange={readBookingFile} />
       {booking != null && (
         <BookingImport trip={trip} text={booking} onImport={addBooking} onClose={() => setBooking(null)} />
       )}
@@ -471,9 +471,7 @@ export default function TripView({ id, navigate }) {
           onClose={() => setDayModal(null)}
         />
       )}
-      {editTrip && (
-        <TripForm initial={trip} onSave={saveTrip} onClose={() => setEditTrip(false)} />
-      )}
+      {editTrip && <TripForm initial={trip} onSave={saveTrip} onClose={() => setEditTrip(false)} />}
     </div>
   )
 }

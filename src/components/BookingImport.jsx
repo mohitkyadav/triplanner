@@ -89,7 +89,9 @@ export default function BookingImport({ trip, text, onImport, onClose }) {
                       : 'ring-slate-200 hover:bg-slate-50 dark:ring-slate-700 dark:hover:bg-slate-800/50'
                   }`}
                 >
-                  <span className={`shrink-0 pt-0.5 ${on ? 'text-brand-600 dark:text-brand-300' : 'text-slate-300 dark:text-slate-600'}`}>
+                  <span
+                    className={`shrink-0 pt-0.5 ${on ? 'text-brand-600 dark:text-brand-300' : 'text-slate-300 dark:text-slate-600'}`}
+                  >
                     {on ? <IconCheckCircle className="size-5" /> : <IconCircle className="size-5" />}
                   </span>
                   <span className={`grid size-9 shrink-0 place-items-center rounded-lg text-lg ${cat.badge}`}>

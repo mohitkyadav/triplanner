@@ -82,7 +82,11 @@ export function budgetSummary(trip) {
   let split = null
   if (travellers.length >= 2) {
     const share = shared / travellers.length
-    const balances = travellers.map(name => ({ name, paid: round2(paidBy.get(name)), balance: round2(paidBy.get(name) - share) }))
+    const balances = travellers.map(name => ({
+      name,
+      paid: round2(paidBy.get(name)),
+      balance: round2(paidBy.get(name) - share),
+    }))
     split = { share: round2(share), balances, settlements: settle(balances) }
   }
 
@@ -90,7 +94,9 @@ export function budgetSummary(trip) {
     planned: round2(planned),
     paid: round2(paid),
     budget: trip.budget ?? null,
-    byCategory: [...byType].map(([type, amount]) => ({ type, amount: round2(amount) })).sort((a, b) => b.amount - a.amount),
+    byCategory: [...byType]
+      .map(([type, amount]) => ({ type, amount: round2(amount) }))
+      .sort((a, b) => b.amount - a.amount),
     missingRates: [...missingRates],
     split,
   }

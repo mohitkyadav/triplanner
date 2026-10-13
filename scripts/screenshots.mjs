@@ -40,7 +40,14 @@ const trip = {
       date: day(-1),
       title: 'Arrival',
       items: [
-        plan('flight', '', '07:10', { flightNo: 'LH 1178', from: 'BER', to: 'LIS', endTime: '09:45', cost: 189, paid: true }),
+        plan('flight', '', '07:10', {
+          flightNo: 'LH 1178',
+          from: 'BER',
+          to: 'LIS',
+          endTime: '09:45',
+          cost: 189,
+          paid: true,
+        }),
         plan('hotel', 'Memmo Alfama', '15:00', { hotelAction: 'check-in', cost: 640, paid: true }),
         plan('restaurant', 'Cervejaria Ramiro', '20:00', { notes: 'Garlic prawns, then the steak sandwich', cost: 70 }),
       ],
@@ -71,7 +78,10 @@ const trip = {
       id: 'd5',
       date: day(3),
       title: 'Home',
-      items: [plan('hotel', 'Memmo Alfama', '11:00', { hotelAction: 'check-out' }), plan('flight', '', '17:20', { flightNo: 'LH 1179', from: 'LIS', to: 'BER', endTime: '21:40' })],
+      items: [
+        plan('hotel', 'Memmo Alfama', '11:00', { hotelAction: 'check-out' }),
+        plan('flight', '', '17:20', { flightNo: 'LH 1179', from: 'LIS', to: 'BER', endTime: '21:40' }),
+      ],
     },
   ],
 }
@@ -89,11 +99,14 @@ try {
   for (const shot of shots) {
     const page = await browser.newPage()
     await page.setViewport({ width: shot.width, height: shot.height, deviceScaleFactor: 2 })
-    await page.evaluateOnNewDocument(data => {
-      localStorage.setItem('triplanner:v1', data)
-      localStorage.setItem('triplanner:weather-off', '1')
-      localStorage.setItem('triplanner:theme', 'light')
-    }, JSON.stringify({ trips: [trip] }))
+    await page.evaluateOnNewDocument(
+      data => {
+        localStorage.setItem('triplanner:v1', data)
+        localStorage.setItem('triplanner:weather-off', '1')
+        localStorage.setItem('triplanner:theme', 'light')
+      },
+      JSON.stringify({ trips: [trip] }),
+    )
     await page.goto(`http://localhost:4317/${shot.hash}`, { waitUntil: 'networkidle0' })
     await new Promise(r => setTimeout(r, 600)) // let the scroll-to-today settle
     await page.screenshot({ path: `${OUT}${shot.file}` })

@@ -13,8 +13,7 @@ import { endOf, fmtClock, startOf } from './schedule'
 const REMINDER = { flight: '-PT3H' }
 const DEFAULT_REMINDER = '-PT30M'
 
-const esc = s =>
-  String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
+const esc = s => String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
 
 // Content lines must stay within 75 octets; continuation lines start with a
 // space. Splitting at 60 code points keeps multi-byte text safely under.
@@ -31,13 +30,23 @@ function fold(line) {
 
 const dateBasic = iso => iso.replaceAll('-', '')
 const timeBasic = min => `${fmtClock(min).replace(':', '')}00`
-const dtstamp = () => new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+const dtstamp = () =>
+  new Date()
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '')
 
 function vevent(fields, alarm) {
   const lines = ['BEGIN:VEVENT']
   for (const [k, v] of fields) if (v) lines.push(fold(`${k}:${v}`))
   if (alarm) {
-    lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', fold(`DESCRIPTION:${alarm.text}`), `TRIGGER:${alarm.trigger}`, 'END:VALARM')
+    lines.push(
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      fold(`DESCRIPTION:${alarm.text}`),
+      `TRIGGER:${alarm.trigger}`,
+      'END:VALARM',
+    )
   }
   lines.push('END:VEVENT')
   return lines

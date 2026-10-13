@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Manual theme switching: `dark:` follows the data-theme attribute set by
    src/lib/theme.js (and the pre-paint script in index.html), not the OS. */
@@ -31,17 +31,31 @@ body {
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+  }
 }
 
 @keyframes pop-in {
-  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+  }
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
-.anim-backdrop { animation: fade-in 0.18s ease-out; }
-.anim-sheet { animation: pop-in 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
-.anim-toast { animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.anim-backdrop {
+  animation: fade-in 0.18s ease-out;
+}
+.anim-sheet {
+  animation: pop-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.anim-toast {
+  animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}

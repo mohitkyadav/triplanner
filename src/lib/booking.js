@@ -128,7 +128,10 @@ const KEYWORDS = [
     /\b(train|railway|rail travel|hbf|hauptbahnhof|sncf|deutsche bahn|db navigator|trenitalia|italo|renfe|eurostar|thalys|amtrak|via rail|ns international|sbb|öbb)\b|\b(ice|tgv|railjet)\s?\d/i,
   ],
   ['bus', /\b(bus|flixbus|megabus|greyhound|blablacar|national express|bus station|coach station)\b/i],
-  ['hotel', /\b(hotel|hostel|airbnb|apartment|apartamento|guest ?house|b&b|bed and breakfast|booking\.com|agoda|vrbo|check[\s-]?in|check[\s-]?out)\b/i],
+  [
+    'hotel',
+    /\b(hotel|hostel|airbnb|apartment|apartamento|guest ?house|b&b|bed and breakfast|booking\.com|agoda|vrbo|check[\s-]?in|check[\s-]?out)\b/i,
+  ],
   ['restaurant', /\b(restaurant|opentable|thefork|table for|dinner reservation|lunch reservation)\b/i],
 ]
 const FLIGHT_WORDS = /\b(flight|airline|airways|boarding pass|airport)\b/i
@@ -179,7 +182,10 @@ const notesFor = (description, url) =>
    all that is left — "Your flight to Porto" names no departure at all. */
 export function parseRoute(summary) {
   const s = String(summary ?? '')
-    .replace(/\b(flight|flug|vol|vuelo|voo|your|my|the|trip|booking|confirmation|reservation|itinerary|e-?ticket)\b/gi, ' ')
+    .replace(
+      /\b(flight|flug|vol|vuelo|voo|your|my|the|trip|booking|confirmation|reservation|itinerary|e-?ticket)\b/gi,
+      ' ',
+    )
     .replace(/\b([A-Z][A-Z0-9]|\d[A-Z])[\s-]?\d{1,4}\b/g, ' ')
     .replace(/[:|]/g, ' ')
   const m = /^\s*(.+?)\s*(?:→|->|⇒|✈|\bto\b|\s[–—-]\s)\s*(.+?)\s*$/i.exec(s)
@@ -244,7 +250,14 @@ export function readBooking(text, trip) {
         date: when.date,
         time: when.time,
         fromUtc: Boolean(when.fromUtc),
-        item: { type: 'hotel', hotelAction: action, title, time: when.time, place: location, notes: suffix ? notes : '' },
+        item: {
+          type: 'hotel',
+          hotelAction: action,
+          title,
+          time: when.time,
+          place: location,
+          notes: suffix ? notes : '',
+        },
       })
       // One event covering the whole stay becomes a check-in and a check-out.
       if (!explicit && nights >= 1) {

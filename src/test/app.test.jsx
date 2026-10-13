@@ -96,7 +96,9 @@ describe('Triplanner', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Add trip' }))
 
     await waitFor(() => expect(stored().trips).toHaveLength(2))
-    const names = stored().trips.map(t => t.name).sort()
+    const names = stored()
+      .trips.map(t => t.name)
+      .sort()
     expect(names).toEqual(['Lisbon', 'Lisbon (their edits) (copy)'])
     expect(new Set(stored().trips.map(t => t.id)).size).toBe(2)
   })

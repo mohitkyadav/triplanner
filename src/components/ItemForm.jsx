@@ -56,7 +56,8 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
     to: initial?.to ?? '',
     hotelAction: initial?.hotelAction === 'check-out' ? 'check-out' : 'check-in',
   })
-  const set = k => e => setF(prev => ({ ...prev, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
+  const set = k => e =>
+    setF(prev => ({ ...prev, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
 
   const travellers = trip?.travellers ?? []
 

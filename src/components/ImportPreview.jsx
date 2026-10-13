@@ -15,9 +15,7 @@ export default function ImportPreview({ trips, onConfirm, onCancel, defaultChoic
 
   function confirm() {
     onConfirm(
-      trips.map(t =>
-        existing.has(t.id) && choice[t.id] === 'keep' ? cloneTrip(t, { name: `${t.name} (copy)` }) : t,
-      ),
+      trips.map(t => (existing.has(t.id) && choice[t.id] === 'keep' ? cloneTrip(t, { name: `${t.name} (copy)` }) : t)),
     )
   }
 

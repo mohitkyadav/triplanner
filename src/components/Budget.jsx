@@ -2,17 +2,7 @@ import { useState } from 'react'
 import { catById } from '../lib/categories'
 import { budgetSummary, fmtMoney } from '../lib/money'
 import { useStore } from '../lib/store'
-import {
-  btnChip,
-  btnGhost,
-  btnPrimary,
-  Field,
-  IconAlert,
-  IconChevronDown,
-  IconPencil,
-  inputCls,
-  Modal,
-} from './ui'
+import { btnChip, btnGhost, btnPrimary, Field, IconAlert, IconChevronDown, IconPencil, inputCls, Modal } from './ui'
 
 /* The trip's money in one card: what is planned against the budget, what is
    paid, where it goes, and — with two or more travellers — who owes whom.
@@ -52,12 +42,16 @@ export default function BudgetCard({ trip }) {
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 text-lg">💶</span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">Budget</span>
-          <span className={`block truncate text-xs ${over ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`}>
+          <span
+            className={`block truncate text-xs ${over ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`}
+          >
             {line}
           </span>
         </span>
         {sum.missingRates.length > 0 && <IconAlert className="size-4 shrink-0 text-amber-500" />}
-        <IconChevronDown className={`size-4.5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <IconChevronDown
+          className={`size-4.5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {open && (
@@ -166,9 +160,7 @@ export default function BudgetCard({ trip }) {
 function BudgetForm({ trip, onSave, onClose }) {
   // Every other currency a plan uses gets a rate field.
   const used = [
-    ...new Set(
-      trip.days.flatMap(d => d.items.map(i => i.currency).filter(c => c && c !== trip.currency)),
-    ),
+    ...new Set(trip.days.flatMap(d => d.items.map(i => i.currency).filter(c => c && c !== trip.currency))),
     ...Object.keys(trip.rates ?? {}),
   ]
   const [budget, setBudget] = useState(trip.budget != null ? String(trip.budget) : '')
@@ -186,7 +178,14 @@ function BudgetForm({ trip, onSave, onClose }) {
     const b = parse(budget)
     onSave({
       budget: b != null ? Math.round(b * 100) / 100 : undefined,
-      travellers: [...new Set(travellers.split(',').map(t => t.trim()).filter(Boolean))],
+      travellers: [
+        ...new Set(
+          travellers
+            .split(',')
+            .map(t => t.trim())
+            .filter(Boolean),
+        ),
+      ],
       rates: Object.fromEntries(
         Object.entries(rates)
           .map(([c, v]) => [c, parse(v)])

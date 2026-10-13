@@ -39,8 +39,14 @@ import {
 
 const TONE = {
   ok: { chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300', text: '' },
-  warn: { chip: 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300', text: 'text-amber-700 dark:text-amber-400' },
-  risk: { chip: 'bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300', text: 'text-rose-600 dark:text-rose-400' },
+  warn: {
+    chip: 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300',
+    text: 'text-amber-700 dark:text-amber-400',
+  },
+  risk: {
+    chip: 'bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300',
+    text: 'text-rose-600 dark:text-rose-400',
+  },
   idle: { chip: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', text: '' },
 }
 
@@ -245,11 +251,7 @@ export default function DataSafety({ onExport, onImport }) {
             </Row>
           )}
 
-          <Row
-            icon={IconDownload}
-            title="Files"
-            text="Export a file you keep yourself, or read one back in."
-          >
+          <Row icon={IconDownload} title="Files" text="Export a file you keep yourself, or read one back in.">
             <button className={btnChip} onClick={exportNow}>
               <IconDownload className="size-3.5" />
               Export all
@@ -279,7 +281,8 @@ export default function DataSafety({ onExport, onImport }) {
           ) : (
             <>
               <p className="mb-4 text-[13px] text-slate-500 dark:text-slate-400">
-                This copy was saved {fmtAgo(restore.savedAt)}. For a trip you already have, choose whether the copy replaces it.
+                This copy was saved {fmtAgo(restore.savedAt)}. For a trip you already have, choose whether the copy
+                replaces it.
               </p>
               <ImportPreview
                 trips={restore.trips}

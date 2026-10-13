@@ -162,8 +162,9 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
 }
 
 export default function ItemCard({ trip, item, onEdit, onSetStatus }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({ id: item.id })
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+  })
   return (
     <Card
       trip={trip}

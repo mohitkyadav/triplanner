@@ -16,7 +16,10 @@ beforeEach(() => {
   localStorage.clear()
   history.replaceState(null, '', '/')
   // No test reaches the network (the weather would).
-  vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline in tests'))))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.reject(new Error('offline in tests'))),
+  )
 })
 
 afterEach(() => {

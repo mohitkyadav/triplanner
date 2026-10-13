@@ -66,7 +66,11 @@ function Chip({ item, className = 'size-11 rounded-xl text-xl' }) {
   const cat = catById(item.type)
   const airline = item.type === 'flight' ? airlineFromFlightNo(item.flightNo) : null
   const emoji = <span className={`grid shrink-0 place-items-center ${className} ${cat.badge}`}>{cat.emoji}</span>
-  return airline ? <AirlineLogo iata={airline.iata} name={airline.name} className={className} fallback={emoji} /> : emoji
+  return airline ? (
+    <AirlineLogo iata={airline.iata} name={airline.name} className={className} fallback={emoji} />
+  ) : (
+    emoji
+  )
 }
 
 const timeLabel = entry => (entry.start == null ? 'Any time' : fmtTimes(entry.item))
@@ -95,7 +99,9 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
       <div className="flex items-center gap-2 px-4 pt-3.5">
         <span
           className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
-            running ? 'bg-brand text-white dark:bg-brand-600' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+            running
+              ? 'bg-brand text-white dark:bg-brand-600'
+              : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
           }`}
         >
           {label}
@@ -167,8 +173,7 @@ function Hop({ trip, from, to }) {
       <GapChip gap={gap} />
     </>
   )
-  const cls =
-    'mx-1 my-1.5 flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-slate-500 dark:text-slate-400'
+  const cls = 'mx-1 my-1.5 flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-slate-500 dark:text-slate-400'
   return url ? (
     <a
       href={url}

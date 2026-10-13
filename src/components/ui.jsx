@@ -458,7 +458,9 @@ export function Modal({ title, onClose, children }) {
     if (!dialog.contains(document.activeElement)) dialog.focus()
     const onKey = e => {
       if (e.key !== 'Tab' || openDialogs[openDialogs.length - 1] !== closeRef) return
-      const items = [...dialog.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null || el === document.activeElement)
+      const items = [...dialog.querySelectorAll(FOCUSABLE)].filter(
+        el => el.offsetParent !== null || el === document.activeElement,
+      )
       if (items.length === 0) return
       const first = items[0]
       const last = items[items.length - 1]

@@ -65,8 +65,7 @@ for (const line of text.split('\n')) {
   // Duplicate active codes are usually a cargo/regional subsidiary sharing the
   // parent's code: prefer the non-cargo name, then the older (original) entry.
   const cargo = /cargo/i.test(name)
-  const better =
-    !prev || (prev.cargo && !cargo) || (prev.cargo === cargo && Number(id) < prev.id)
+  const better = !prev || (prev.cargo && !cargo) || (prev.cargo === cargo && Number(id) < prev.id)
   if (better) byIata.set(iata, { id: Number(id), name, cargo })
 }
 
@@ -81,4 +80,6 @@ export const AIRLINES = ${JSON.stringify(map, null, 0)}
 `
 const dest = join(dirname(fileURLToPath(import.meta.url)), '../src/lib/airlines-data.js')
 writeFileSync(dest, out)
-console.log(`parsed ${rows} rows → ${Object.keys(map).length} airlines → ${dest} (${(out.length / 1024).toFixed(1)} KB)`)
+console.log(
+  `parsed ${rows} rows → ${Object.keys(map).length} airlines → ${dest} (${(out.length / 1024).toFixed(1)} KB)`,
+)

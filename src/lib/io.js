@@ -11,8 +11,7 @@ export function downloadFile(filename, content, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export const downloadJSON = (filename, obj) =>
-  downloadFile(filename, JSON.stringify(obj, null, 2), 'application/json')
+export const downloadJSON = (filename, obj) => downloadFile(filename, JSON.stringify(obj, null, 2), 'application/json')
 
 export const exportPayload = trips => ({
   app: 'triplanner',
@@ -112,7 +111,16 @@ function normalizeTrip(t) {
     currency: code(t.currency),
     timeZone: str(t.timeZone),
     ...(money(t.budget) != null && { budget: money(t.budget) }),
-    travellers: Array.isArray(t.travellers) ? [...new Set(t.travellers.map(str).map(s => s.trim()).filter(Boolean))] : [],
+    travellers: Array.isArray(t.travellers)
+      ? [
+          ...new Set(
+            t.travellers
+              .map(str)
+              .map(s => s.trim())
+              .filter(Boolean),
+          ),
+        ]
+      : [],
     rates: Object.fromEntries(
       Object.entries(t.rates && typeof t.rates === 'object' ? t.rates : {})
         .map(([k, v]) => [code(k), num(v)])

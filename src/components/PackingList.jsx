@@ -1,15 +1,7 @@
 import { useState } from 'react'
 import { missingFrom, PACKING_TEMPLATES } from '../lib/packing'
 import { uid, useStore } from '../lib/store'
-import {
-  IconCheckCircle,
-  IconChevronDown,
-  IconCircle,
-  IconPlus,
-  IconX,
-  iconBtn,
-  inputCls,
-} from './ui'
+import { IconCheckCircle, IconChevronDown, IconCircle, IconPlus, IconX, iconBtn, inputCls } from './ui'
 
 export default function PackingList({ trip }) {
   const { state, dispatch } = useStore()
