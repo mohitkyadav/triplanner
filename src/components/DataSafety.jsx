@@ -20,6 +20,7 @@ import ImportPreview from './ImportPreview'
 import {
   btnChip,
   btnChipBrand,
+  Collapse,
   IconAlert,
   IconChevronDown,
   IconDownload,
@@ -158,7 +159,7 @@ export default function DataSafety({ onExport, onImport }) {
         />
       </button>
 
-      {open && (
+      <Collapse open={open}>
         <div className="space-y-4 border-t border-slate-100 px-5 pb-5 pt-4 dark:border-slate-800">
           {supportsBackupFile &&
             (info.fileName ? (
@@ -270,7 +271,7 @@ export default function DataSafety({ onExport, onImport }) {
             </p>
           )}
         </div>
-      )}
+      </Collapse>
 
       {restore && (
         <Modal title="Restore the device copy" onClose={() => setRestore(null)}>

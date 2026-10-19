@@ -31,7 +31,7 @@ import { catById, flightRoute, titleFor } from '../lib/categories'
 import { deviceTimeZone, fmtDate } from '../lib/dates'
 import { dayRouteUrl, pairRouteUrl } from '../lib/maps'
 import { costCurrency, dayCost, fmtMoney } from '../lib/money'
-import { transition, vtName } from '../lib/motion'
+import { reducedMotion, transition, vtName } from '../lib/motion'
 import { dayPlan, fmtClock, fmtDuration, fmtTimes, gapBetween, useClock } from '../lib/schedule'
 import { uid, useStore } from '../lib/store'
 import { useWeather } from '../lib/weather'
@@ -95,6 +95,10 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
   const { item } = entry
   const cat = catById(item.type)
   const countdown = countdownFor(entry, running, now)
+  const left =
+    running && now != null && entry.end != null && entry.end > entry.start
+      ? Math.max(0, Math.min(100, ((entry.end - now) / (entry.end - entry.start)) * 100))
+      : null
   const tracker = item.type === 'flight' ? flightTrackerUrl(item.flightNo) : null
 
   return (
@@ -106,12 +110,18 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
     >
       <div className="flex items-center gap-2 px-4 pt-3.5">
         <span
-          className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
             running
               ? 'bg-brand text-white dark:bg-brand-600'
               : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
           }`}
         >
+          {running && (
+            <span className="relative flex size-1.5" aria-hidden="true">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-75 motion-reduce:hidden" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-accent" />
+            </span>
+          )}
           {label}
         </span>
         <span className="flex-1" />
@@ -128,6 +138,15 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
             {timeLabel(entry)}
             {countdown && <span className="font-medium text-slate-500 dark:text-slate-400"> · {countdown}</span>}
           </p>
+          {left != null && (
+            // the time left, draining as the plan runs
+            <span className="mt-1.5 block h-1 w-full max-w-48 overflow-hidden rounded-full bg-brand-100 dark:bg-brand-500/15">
+              <span
+                className="block h-full rounded-full bg-brand-500 transition-[width] duration-1000 ease-linear dark:bg-brand-400"
+                style={{ width: `${left}%` }}
+              />
+            </span>
+          )}
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
             <span className={`rounded-md px-1.5 py-0.5 font-medium ${cat.badge}`}>{cat.label}</span>
             {item.type === 'flight' && item.title && flightRoute(item) && <span>{flightRoute(item)}</span>}
@@ -270,7 +289,7 @@ function Section({ title, count, children }) {
 
 /* Two bursts from the bottom corners, loaded only when a day is complete. */
 function confetti() {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (reducedMotion()) return
   import('canvas-confetti')
     .then(({ default: fire }) => {
       const colors = ['#1a7a72', '#48a094', '#e5a33f', '#f4c27a', '#ffffff']
@@ -419,7 +438,11 @@ export default function Today({ id, navigate }) {
     <div className="min-h-dvh">
       <Header trip={trip} navigate={navigate} routeUrl={routeUrl} zoneClock={zoneClock} />
 
-      <div className="sticky top-14 z-30 border-b border-slate-200/60 bg-slate-50/80 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/80">
+      <div
+        className="sticky top-14 z-30 border-b border-slate-200/60 bg-slate-50/80 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/80"
+        style={{ viewTransitionName: vtName('tripmode', trip.id) }}
+        data-vt-shared
+      >
         <div className="mx-auto flex h-12 max-w-2xl items-center gap-1 px-3">
           <button
             className={`${iconBtn} disabled:opacity-30`}
@@ -535,19 +558,30 @@ export default function Today({ id, navigate }) {
         )}
 
         {plan.total > 0 && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:ring-slate-800">
-            <span className="tabular-nums">
-              {plan.doneCount} of {plan.openCount} done
-            </span>
-            {cost > 0 && <span className="tabular-nums">{fmtMoney(cost, trip.currency)}</span>}
-            <span className="flex-1" />
-            <button className={btnChip} onClick={() => setItemModal({ dayId: day.id })}>
-              <IconPlus className="size-3.5" />
-              Add
-            </button>
-            <button className={btnChip} onClick={() => navigate(`/trip/${trip.id}`)}>
-              Full day list
-            </button>
+          <div className="space-y-2.5 rounded-2xl bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:ring-slate-800">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="tabular-nums">
+                <span key={plan.doneCount} className="anim-tick inline-block">
+                  {plan.doneCount}
+                </span>{' '}
+                of {plan.openCount} done
+              </span>
+              {cost > 0 && <span className="tabular-nums">{fmtMoney(cost, trip.currency)}</span>}
+              <span className="flex-1" />
+              <button className={btnChip} onClick={() => setItemModal({ dayId: day.id })}>
+                <IconPlus className="size-3.5" />
+                Add
+              </button>
+              <button className={btnChip} onClick={() => navigate(`/trip/${trip.id}`)}>
+                Full day list
+              </button>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+              <div
+                className="bar-fill h-full rounded-full bg-emerald-500"
+                style={{ '--fill': `${plan.openCount ? (plan.doneCount / plan.openCount) * 100 : 0}%` }}
+              />
+            </div>
           </div>
         )}
       </main>

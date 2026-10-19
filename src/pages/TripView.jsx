@@ -111,6 +111,13 @@ export default function TripView({ id, navigate }) {
   const [sharing, setSharing] = useState(false)
   const [booking, setBooking] = useState(null) // contents of a chosen .ics file
   const [activeItem, setActiveItem] = useState(null) // item being dragged (for the overlay)
+  // Plans that show up after the page did — added, imported, brought back
+  // by Undo — flash where they land. Not while dragging: a card moving
+  // between days shows up there too.
+  const arrivals = useRef(false)
+  useEffect(() => {
+    arrivals.current = !activeItem
+  }, [activeItem])
   const dragSnapshot = useRef(null) // days before the drag, restored on cancel
   const icsRef = useRef(null)
 
@@ -399,6 +406,8 @@ export default function TripView({ id, navigate }) {
           {todayIndex >= 0 && (
             <button
               onClick={() => navigate(`/trip/${trip.id}/today`)}
+              style={{ viewTransitionName: vtName('tripmode', trip.id) }}
+              data-vt-shared
               className="flex w-full items-center gap-3 border-t border-slate-100 px-5 py-3 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
             >
               <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 text-amber-700 dark:text-amber-400">
@@ -440,6 +449,7 @@ export default function TripView({ id, navigate }) {
               onEditDay={() => setDayModal({ day, index: i })}
               onAddItem={() => setItemModal({ dayId: day.id })}
               onEditItem={item => setItemModal({ dayId: day.id, item })}
+              arrivals={arrivals}
             />
           ))}
           <DragOverlay>{activeItem ? <ItemCardOverlay trip={trip} item={activeItem} /> : null}</DragOverlay>

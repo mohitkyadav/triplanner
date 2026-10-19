@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
@@ -31,7 +32,19 @@ const STATUS_UI = {
     label: 'Planned — tap to mark done',
   },
 }
-function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragStyle, handleRef, handleProps }) {
+function Card({
+  trip,
+  item,
+  onEdit,
+  onSetStatus,
+  ghost,
+  overlay,
+  arrived,
+  dragRef,
+  dragStyle,
+  handleRef,
+  handleProps,
+}) {
   const cat = catById(item.type)
   const title = titleFor(item)
   const status = STATUS_UI[item.status] ?? STATUS_UI.planned
@@ -75,9 +88,9 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
         ghost
           ? 'opacity-40 shadow-sm ring-slate-200 dark:ring-slate-800'
           : overlay
-            ? 'shadow-2xl ring-brand-400 dark:ring-brand-500'
+            ? 'anim-lift shadow-2xl ring-brand-400 dark:ring-brand-500'
             : 'shadow-sm ring-slate-200 dark:ring-slate-800'
-      }`}
+      } ${arrived ? 'anim-arrive' : ''}`}
     >
       <button
         ref={handleRef}
@@ -168,7 +181,8 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
   )
 }
 
-export default function ItemCard({ trip, item, onEdit, onSetStatus }) {
+export default function ItemCard({ trip, item, onEdit, onSetStatus, arrivals }) {
+  const [arrived] = useState(() => Boolean(arrivals?.current))
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
   })
@@ -178,6 +192,7 @@ export default function ItemCard({ trip, item, onEdit, onSetStatus }) {
       item={item}
       onEdit={onEdit}
       onSetStatus={onSetStatus}
+      arrived={arrived}
       ghost={isDragging}
       dragRef={setNodeRef}
       dragStyle={{ transform: CSS.Transform.toString(transform), transition }}

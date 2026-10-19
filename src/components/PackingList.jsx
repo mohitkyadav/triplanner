@@ -1,7 +1,18 @@
 import { useState } from 'react'
 import { missingFrom, PACKING_TEMPLATES } from '../lib/packing'
 import { uid, useStore } from '../lib/store'
-import { IconCheckCircle, IconChevronDown, IconCircle, IconPlus, IconX, iconBtn, inputCls, PopIcon, Strike } from './ui'
+import {
+  Collapse,
+  iconBtn,
+  IconCheckCircle,
+  IconChevronDown,
+  IconCircle,
+  IconPlus,
+  IconX,
+  inputCls,
+  PopIcon,
+  Strike,
+} from './ui'
 import { vtName } from '../lib/motion'
 
 export default function PackingList({ trip }) {
@@ -62,7 +73,7 @@ export default function PackingList({ trip }) {
         />
       </button>
 
-      {open && (
+      <Collapse open={open}>
         <div className="border-t border-slate-100 px-5 pb-4 pt-3 dark:border-slate-800">
           {list.length > 0 && (
             <ul className="mb-3 space-y-0.5">
@@ -144,7 +155,7 @@ export default function PackingList({ trip }) {
             </button>
           </form>
         </div>
-      )}
+      </Collapse>
     </section>
   )
 }

@@ -11,12 +11,11 @@ import { flushSync } from 'react-dom'
 
 let pending = null // the transition waiting for its update, see `beforeUpdate`
 
+export const reducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 export function motionOK() {
-  return (
-    typeof document !== 'undefined' &&
-    typeof document.startViewTransition === 'function' &&
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
+  return typeof document !== 'undefined' && typeof document.startViewTransition === 'function' && !reducedMotion()
 }
 
 /* Applies `update` (a React state change) inside a view transition.

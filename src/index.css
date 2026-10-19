@@ -220,13 +220,125 @@ html[data-vt='theme']::view-transition-new(root) {
   mix-blend-mode: normal;
 }
 
+/* cards that open and shut (Packing list, Budget, Keep your trips safe) */
+.collapse-box {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.25s ease;
+}
+.collapse-box[data-open='false'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+@starting-style {
+  .collapse-box {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+
+/* bars fill from empty when they first show, and glide when they change */
+.bar-fill {
+  width: var(--fill);
+  transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@starting-style {
+  .bar-fill {
+    width: 0;
+  }
+}
+
+/* a number that changed ticks up into place */
+@keyframes tick {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em);
+  }
+}
+.anim-tick {
+  animation: tick 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* the trip cards on Home rise in one after another */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+.anim-rise {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* a plan that just arrived glows once where it landed */
+@keyframes arrive {
+  0%,
+  35% {
+    box-shadow: 0 0 0 3px var(--color-accent);
+  }
+}
+.anim-arrive {
+  animation: arrive 1.4s ease-out;
+}
+
+/* a card picked up to drag lifts and tilts a little */
+@keyframes lift {
+  to {
+    transform: rotate(1.5deg) scale(1.03);
+  }
+}
+.anim-lift {
+  animation: lift 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* menus open from their button */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+}
+.anim-menu {
+  transform-origin: top right;
+  animation: menu-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* toasts leave as they came, and an Undo shows how long it stays */
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+.anim-toast-out {
+  animation: toast-out 0.18s ease-in forwards;
+}
+@keyframes drain {
+  to {
+    transform: scaleX(0);
+  }
+}
+.toast-timer {
+  transform-origin: left;
+  animation: drain linear forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-pop,
   .anim-sheet,
-  .anim-toast {
+  .anim-toast,
+  .anim-toast-out,
+  .anim-tick,
+  .anim-rise,
+  .anim-lift,
+  .anim-menu {
     animation: none;
   }
-  .strike {
+  .strike,
+  .collapse-box,
+  .bar-fill {
     transition: none;
   }
 }

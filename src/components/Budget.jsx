@@ -2,7 +2,19 @@ import { useState } from 'react'
 import { catById } from '../lib/categories'
 import { budgetSummary, fmtMoney } from '../lib/money'
 import { useStore } from '../lib/store'
-import { btnChip, btnGhost, btnPrimary, Field, IconAlert, IconChevronDown, IconPencil, inputCls, Modal } from './ui'
+import {
+  btnChip,
+  btnGhost,
+  btnPrimary,
+  Collapse,
+  CountUp,
+  Field,
+  IconAlert,
+  IconChevronDown,
+  IconPencil,
+  inputCls,
+  Modal,
+} from './ui'
 
 /* The trip's money in one card: what is planned against the budget, what is
    paid, where it goes, and — with two or more travellers — who owes whom.
@@ -12,7 +24,7 @@ function Bar({ value, max, tone = 'bg-brand-500' }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
   return (
     <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-      <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
+      <div className={`bar-fill h-full rounded-full ${tone}`} style={{ '--fill': `${pct}%` }} />
     </div>
   )
 }
@@ -57,7 +69,7 @@ export default function BudgetCard({ trip }) {
         />
       </button>
 
-      {open && (
+      <Collapse open={open}>
         <div className="space-y-4 border-t border-slate-100 px-5 pb-4 pt-3 text-sm dark:border-slate-800">
           {sum.budget != null && (
             <div className="space-y-1.5">
@@ -73,11 +85,15 @@ export default function BudgetCard({ trip }) {
           <dl className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
               <dt className="text-xs text-slate-500 dark:text-slate-400">Planned</dt>
-              <dd className="text-base font-bold tabular-nums">{fmtMoney(sum.planned, cur)}</dd>
+              <dd className="text-base font-bold tabular-nums">
+                <CountUp value={sum.planned} format={v => fmtMoney(v, cur)} />
+              </dd>
             </div>
             <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
               <dt className="text-xs text-slate-500 dark:text-slate-400">Paid so far</dt>
-              <dd className="text-base font-bold tabular-nums">{fmtMoney(sum.paid, cur)}</dd>
+              <dd className="text-base font-bold tabular-nums">
+                <CountUp value={sum.paid} format={v => fmtMoney(v, cur)} />
+              </dd>
             </div>
           </dl>
 
@@ -144,7 +160,7 @@ export default function BudgetCard({ trip }) {
             Budget, travellers and rates
           </button>
         </div>
-      )}
+      </Collapse>
 
       {editing && (
         <BudgetForm

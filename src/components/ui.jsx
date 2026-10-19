@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { beforeUpdate, motionOK, vtName } from '../lib/motion'
+import { beforeUpdate, motionOK, reducedMotion, vtName } from '../lib/motion'
 
 /* ---------- icons (24px stroke, lucide-style) ---------- */
 
@@ -332,6 +332,53 @@ export function PopIcon({ icon: Icon, state, className = '' }) {
   return <Icon key={String(state)} className={state === first ? className : `anim-pop ${className}`} />
 }
 
+/* Content that slides open and shut instead of appearing at once. It stays
+   mounted while it closes, then goes. */
+export function Collapse({ open, children }) {
+  const [mounted, setMounted] = useState(open)
+  if (open && !mounted) setMounted(true)
+  // with reduced motion there is no transition to wait for
+  if (!open && mounted && reducedMotion()) setMounted(false)
+  if (!mounted) return null
+  return (
+    <div
+      className="collapse-box"
+      data-open={open}
+      onTransitionEnd={e => e.target === e.currentTarget && !open && setMounted(false)}
+    >
+      <div className="min-h-0 overflow-hidden">{children}</div>
+    </div>
+  )
+}
+
+/* A number that counts to its value: from zero when it first shows, from
+   the old value when it changes. `format` turns it into text. */
+export function CountUp({ value, format = String, duration = 700 }) {
+  const [shown, setShown] = useState(() => (reducedMotion() ? value : 0))
+  const current = useRef(shown)
+  useEffect(() => {
+    const from = current.current
+    if (from === value) return
+    if (reducedMotion()) {
+      current.current = value
+      setShown(value)
+      return
+    }
+    let frame
+    const start = performance.now()
+    const step = now => {
+      const k = Math.min(1, (now - start) / duration)
+      const v = from + (value - from) * (1 - (1 - k) ** 3)
+      current.current = k === 1 ? value : Math.round(v) // whole numbers on the way keep the width steady
+      setShown(current.current)
+      if (k < 1) frame = requestAnimationFrame(step)
+    }
+    frame = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(frame)
+  }, [value, duration])
+  return format(shown)
+}
+
 /* Text that gets crossed out with a line drawn across it, left to right. */
 export function Strike({ on, children }) {
   return <span className={`strike ${on ? 'is-struck' : ''}`}>{children}</span>
@@ -440,7 +487,7 @@ if (typeof window !== 'undefined') {
 let ghosts = 0
 function playExit(node) {
   if (!node?.isConnected || typeof node.animate !== 'function') return
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (reducedMotion()) return
   const ghost = node.cloneNode(true)
   // what the form showed, which a copy does not carry over
   const fields = node.querySelectorAll('input, textarea, select')
@@ -669,7 +716,7 @@ export function Menu({ items, label = 'More options' }) {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-50 mt-1 w-60 overflow-hidden rounded-xl bg-white py-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+          <div className="anim-menu absolute right-0 top-full z-50 mt-1 w-60 overflow-hidden rounded-xl bg-white py-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
             {items.map(item => (
               <button
                 key={item.label}
@@ -709,19 +756,22 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]) // [{ id, text, action? }]
   const timers = useRef(new Map())
 
+  // A toast fades away first, then goes.
   const dismiss = useCallback(id => {
     clearTimeout(timers.current.get(id))
     timers.current.delete(id)
-    setToasts(list => list.filter(t => t.id !== id))
+    setToasts(list => list.map(t => (t.id === id ? { ...t, leaving: true } : t)))
+    setTimeout(() => setToasts(list => list.filter(t => t.id !== id)), reducedMotion() ? 0 : 180)
   }, [])
 
   const toast = useCallback(
     (text, action) => {
       const id = Math.random().toString(36).slice(2)
-      setToasts(list => [...list, { id, text, action }].slice(-MAX_TOASTS))
+      const life = action ? 6000 : 2600
+      setToasts(list => [...list.filter(t => !t.leaving), { id, text, action, life }].slice(-MAX_TOASTS))
       timers.current.set(
         id,
-        setTimeout(() => dismiss(id), action ? 6000 : 2600),
+        setTimeout(() => dismiss(id), life),
       )
     },
     [dismiss],
@@ -738,7 +788,7 @@ export function ToastProvider({ children }) {
   useEffect(() => {
     const onKey = e => {
       if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== 'z' || isTyping(e.target)) return
-      const last = [...toasts].reverse().find(t => t.action?.label === 'Undo')
+      const last = [...toasts].reverse().find(t => !t.leaving && t.action?.label === 'Undo')
       if (!last) return
       e.preventDefault()
       run(last)
@@ -759,8 +809,17 @@ export function ToastProvider({ children }) {
           {toasts.map(t => (
             <div
               key={t.id}
-              className="anim-toast pointer-events-auto flex max-w-full items-center gap-1 rounded-full bg-slate-900 py-2 pl-4 pr-2 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900"
+              aria-hidden={t.leaving || undefined}
+              className={`${t.leaving ? 'anim-toast-out' : 'anim-toast'} pointer-events-auto relative flex max-w-full items-center gap-1 overflow-hidden rounded-full bg-slate-900 py-2 pl-4 pr-2 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900`}
             >
+              {/* how long the Undo stays */}
+              {t.action && (
+                <span
+                  aria-hidden="true"
+                  className="toast-timer absolute inset-x-0 bottom-0 h-0.5 bg-accent dark:bg-brand-500"
+                  style={{ animationDuration: `${t.life}ms` }}
+                />
+              )}
               <span className="truncate">{t.text}</span>
               {t.action ? (
                 <button

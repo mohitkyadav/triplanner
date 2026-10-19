@@ -20,6 +20,7 @@ export default function DayCard({
   onEditDay,
   onAddItem,
   onEditItem,
+  arrivals,
 }) {
   const { dispatch } = useStore()
   const toast = useToast()
@@ -116,6 +117,7 @@ export default function DayCard({
                   item={item}
                   onEdit={() => onEditItem(item)}
                   onSetStatus={status => setItemStatus(item.id, status)}
+                  arrivals={arrivals}
                 />
               ))}
             </ul>

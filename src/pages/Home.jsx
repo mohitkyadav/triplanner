@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Account, { AccountMenu } from '../components/Account'
 import DataSafety from '../components/DataSafety'
 import ScanModal from '../components/ScanModal'
@@ -26,7 +26,7 @@ import { vtName } from '../lib/motion'
 
 const GROUP_TITLE = { ongoing: 'Under way', upcoming: 'Upcoming', undated: 'No dates yet', past: 'Past trips' }
 
-function TripRow({ trip, navigate, onDelete }) {
+function TripRow({ trip, navigate, onDelete, introAt }) {
   const phase = tripPhase(trip)
   const stops = trip.days.reduce((n, d) => n + d.items.length, 0)
   const open = () => navigate(`/trip/${trip.id}`)
@@ -43,9 +43,12 @@ function TripRow({ trip, navigate, onDelete }) {
       role="link"
       tabIndex={0}
       aria-label={`Open ${trip.name}`}
-      style={{ viewTransitionName: vtName('trip', trip.id) }}
+      style={{
+        viewTransitionName: vtName('trip', trip.id),
+        animationDelay: introAt != null ? `${Math.min(introAt, 8) * 60}ms` : undefined,
+      }}
       data-vt-shared
-      className={`group cursor-pointer rounded-2xl bg-white p-4 shadow-sm outline-none ring-1 transition hover:shadow-md hover:ring-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-slate-900 dark:hover:ring-brand-600 ${
+      className={`${introAt != null ? 'anim-rise ' : ''}group cursor-pointer rounded-2xl bg-white p-4 shadow-sm outline-none ring-1 transition hover:shadow-md hover:ring-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-slate-900 dark:hover:ring-brand-600 ${
         phase.phase === 'ongoing' ? 'ring-brand-300 dark:ring-brand-600' : 'ring-slate-200 dark:ring-slate-800'
       } ${phase.phase === 'past' ? 'opacity-75' : ''}`}
     >
@@ -91,6 +94,8 @@ function TripRow({ trip, navigate, onDelete }) {
         {phase.phase === 'ongoing' && (
           <button
             className={btnChipBrand}
+            style={{ viewTransitionName: vtName('tripmode', trip.id) }}
+            data-vt-shared
             onClick={e => {
               e.stopPropagation()
               navigate(`/trip/${trip.id}/today`)
@@ -124,8 +129,17 @@ function WeatherSetting() {
   )
 }
 
+// The trip cards rise in one after another the first time Home shows.
+let introPlayed = false
+
 export default function Home({ navigate }) {
   const { state, dispatch } = useStore()
+  const [intro] = useState(() => !introPlayed)
+  useEffect(() => {
+    introPlayed = true
+  }, [])
+  const groups = groupTrips(state.trips)
+  const introOrder = new Map(groups.flatMap(g => g.trips).map((t, i) => [t.id, i]))
   const toast = useToast()
   const [creating, setCreating] = useState(false)
   const [scanning, setScanning] = useState(false)
@@ -220,14 +234,20 @@ export default function Home({ navigate }) {
         ) : (
           <>
             <div className="space-y-6">
-              {groupTrips(state.trips).map(group => (
+              {groups.map(group => (
                 <section key={group.phase} aria-label={GROUP_TITLE[group.phase]}>
                   <h2 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                     {GROUP_TITLE[group.phase]}
                   </h2>
                   <ul className="space-y-3">
                     {group.trips.map(trip => (
-                      <TripRow key={trip.id} trip={trip} navigate={navigate} onDelete={deleteTrip} />
+                      <TripRow
+                        key={trip.id}
+                        trip={trip}
+                        navigate={navigate}
+                        onDelete={deleteTrip}
+                        introAt={intro ? introOrder.get(trip.id) : null}
+                      />
                     ))}
                   </ul>
                 </section>
