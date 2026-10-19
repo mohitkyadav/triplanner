@@ -34,7 +34,7 @@ device; signing in (optional) syncs your trips between devices.
 - **Share** — the trip travels inside the link, or as a QR code the built-in
   scanner reads. No server. Leave out costs or notes if you like. Receiving a
   trip you already have offers *Keep both* or *Replace mine*.
-- **Sync** — sign in with an emailed link and the trips follow you to every
+- **Sync** — sign in with an emailed code (or link) and the trips follow you to every
   device. One account for all the chapri apps (Supabase project
   `chapri-apps`). Offline still works; changes go up when you are back.
   Documents stay on the device that added them.

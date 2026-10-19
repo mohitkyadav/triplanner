@@ -169,13 +169,21 @@ export async function saveDisplayName(name) {
   if (session && data.user) setSession({ ...session, user: data.user })
 }
 
-// Sign-in is a link sent by email that comes back to this app. A new email
-// address gets an account on the way (one account for every chapri app).
+// Sign-in is an email with a 6-digit code and a link. The code is typed into
+// the app, so it works anywhere — also in an installed app, where the link
+// would open the browser instead. The link comes back to this app in a normal
+// tab. A new email address gets an account on the way (one account for every
+// chapri app).
 export async function sendLink(email) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: { shouldCreateUser: true, emailRedirectTo: `${location.origin}/` },
   })
+  if (error) throw error
+}
+
+export async function verifyCode(email, code) {
+  const { error } = await supabase.auth.verifyOtp({ email, token: code, type: 'email' })
   if (error) throw error
 }
 

@@ -9,6 +9,7 @@ import {
   syncEnabled,
   useSession,
   useSyncStatus,
+  verifyCode,
 } from '../lib/sync'
 import { IconLogIn, IconLogOut, IconPencil, IconRotate, btnChip, btnChipBrand, iconBtn, inputCls, useToast } from './ui'
 
@@ -23,20 +24,20 @@ function statusLine(sync) {
   return 'Connected'
 }
 
+const CODE_LENGTH = 6
+
 function SignIn() {
   const [email, setEmail] = useState('')
   const [sentTo, setSentTo] = useState(null)
+  const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
-  async function send(e) {
-    e.preventDefault()
-    const to = email.trim()
+  async function run(fn) {
     setBusy(true)
     setError(null)
     try {
-      await sendLink(to)
-      setSentTo(to)
+      await fn()
     } catch (err) {
       setError(err?.message ?? 'Something went wrong')
     } finally {
@@ -44,16 +45,59 @@ function SignIn() {
     }
   }
 
+  function send(e) {
+    e.preventDefault()
+    const to = email.trim()
+    run(async () => {
+      await sendLink(to)
+      setSentTo(to)
+      setCode('')
+    })
+  }
+
+  // Signed in, the card goes away by itself (the session changes).
+  const verify = digits => run(() => verifyCode(sentTo, digits))
+
+  function onCode(value) {
+    const digits = value.replace(/\D/g, '').slice(0, CODE_LENGTH)
+    setCode(digits)
+    if (digits.length === CODE_LENGTH && !busy) verify(digits) // a pasted or autofilled code signs in at once
+  }
+
   return sentTo ? (
-    <div className="space-y-2">
+    <form
+      onSubmit={e => {
+        e.preventDefault()
+        verify(code)
+      }}
+      className="space-y-2"
+    >
       <p className="text-[13px] text-slate-500 dark:text-slate-400">
-        We sent a sign-in link to <span className="font-semibold text-slate-700 dark:text-slate-200">{sentTo}</span>.
-        Open it on this device, in this browser — this page signs in by itself.
+        We sent a code to <span className="font-semibold text-slate-700 dark:text-slate-200">{sentTo}</span>. Type it
+        here, or open the link in the email in this browser.
       </p>
-      <button type="button" className={btnChip} onClick={() => setSentTo(null)}>
-        Use another email
-      </button>
-    </div>
+      <input
+        className={`${inputCls} text-center font-mono tracking-[0.4em]`}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        placeholder="000000"
+        aria-label="Sign-in code"
+        value={code}
+        onChange={e => onCode(e.target.value)}
+        disabled={busy}
+        autoFocus
+      />
+      {error && <p className="text-[13px] text-rose-600 dark:text-rose-400">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button className={btnChipBrand} disabled={busy || code.length !== CODE_LENGTH}>
+          <IconLogIn className="size-3.5" />
+          {busy ? 'Signing in…' : 'Sign in'}
+        </button>
+        <button type="button" className={btnChip} onClick={() => setSentTo(null)} disabled={busy}>
+          Use another email
+        </button>
+      </div>
+    </form>
   ) : (
     <form onSubmit={send} className="space-y-2">
       <input
@@ -69,7 +113,7 @@ function SignIn() {
       {error && <p className="text-[13px] text-rose-600 dark:text-rose-400">{error}</p>}
       <button className={btnChipBrand} disabled={busy || !email.trim()}>
         <IconLogIn className="size-3.5" />
-        {busy ? 'Sending…' : 'Email me a sign-in link'}
+        {busy ? 'Sending…' : 'Email me a sign-in code'}
       </button>
     </form>
   )
