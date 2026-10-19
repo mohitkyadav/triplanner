@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AirlineLogo from '../components/AirlineLogo'
 import { DocumentChips } from '../components/Documents'
 import ItemForm from '../components/ItemForm'
@@ -22,6 +22,8 @@ import {
   IconRoute,
   IconXCircle,
   iconBtn,
+  PopIcon,
+  Strike,
   useToast,
 } from '../components/ui'
 import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
@@ -29,6 +31,7 @@ import { catById, flightRoute, titleFor } from '../lib/categories'
 import { deviceTimeZone, fmtDate } from '../lib/dates'
 import { dayRouteUrl, pairRouteUrl } from '../lib/maps'
 import { costCurrency, dayCost, fmtMoney } from '../lib/money'
+import { transition, vtName } from '../lib/motion'
 import { dayPlan, fmtClock, fmtDuration, fmtTimes, gapBetween, useClock } from '../lib/schedule'
 import { uid, useStore } from '../lib/store'
 import { useWeather } from '../lib/weather'
@@ -84,6 +87,10 @@ function countdownFor(entry, running, now) {
 
 /* ---------- the card that leads the view ---------- */
 
+// A plan keeps its name wherever it shows, so marking it done moves the card
+// down into "Done and skipped" and the next plan up into its place.
+const planName = item => ({ viewTransitionName: vtName('now', item.id), viewTransitionClass: 'plan' })
+
 function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
   const { item } = entry
   const cat = catById(item.type)
@@ -95,6 +102,7 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
       className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 dark:bg-slate-900 ${
         running ? 'ring-2 ring-brand-500 dark:ring-brand-400' : 'ring-slate-200 dark:ring-slate-800'
       }`}
+      style={planName(item)}
     >
       <div className="flex items-center gap-2 px-4 pt-3.5">
         <span
@@ -197,7 +205,10 @@ function PlanRow({ trip, entry, clash, muted, onEdit, onStatus }) {
   const StatusIcon = done ? IconCheckCircle : skipped ? IconXCircle : IconCircle
 
   return (
-    <li className="flex items-center gap-2.5 rounded-xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+    <li
+      className="flex items-center gap-2.5 rounded-xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+      style={planName(item)}
+    >
       <button
         onClick={onEdit}
         className={`flex min-w-0 flex-1 items-center gap-2.5 text-left ${muted ? 'opacity-55' : ''}`}
@@ -212,8 +223,8 @@ function PlanRow({ trip, entry, clash, muted, onEdit, onStatus }) {
         </span>
         <Chip item={item} className="size-8 rounded-lg text-sm" />
         <span className="min-w-0 flex-1">
-          <span className={`block truncate text-sm font-medium ${skipped ? 'line-through' : ''}`}>
-            {titleFor(item)}
+          <span className="block truncate text-sm font-medium">
+            <Strike on={skipped}>{titleFor(item)}</Strike>
           </span>
           <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-slate-500 dark:text-slate-400">
             <span>{catById(item.type).label}</span>
@@ -239,7 +250,7 @@ function PlanRow({ trip, entry, clash, muted, onEdit, onStatus }) {
         }`}
         aria-label={`Change the result of ${titleFor(item)}`}
       >
-        <StatusIcon className="size-5.5" />
+        <PopIcon icon={StatusIcon} state={item.status} className="size-5.5" />
       </button>
     </li>
   )
@@ -257,6 +268,19 @@ function Section({ title, count, children }) {
   )
 }
 
+/* Two bursts from the bottom corners, loaded only when a day is complete. */
+function confetti() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  import('canvas-confetti')
+    .then(({ default: fire }) => {
+      const colors = ['#1a7a72', '#48a094', '#e5a33f', '#f4c27a', '#ffffff']
+      const shot = { particleCount: 70, spread: 65, startVelocity: 55, ticks: 220, colors, zIndex: 70 }
+      fire({ ...shot, angle: 60, origin: { x: 0, y: 0.95 } })
+      fire({ ...shot, angle: 120, origin: { x: 1, y: 0.95 } })
+    })
+    .catch(() => {})
+}
+
 /* ---------- the page ---------- */
 
 export default function Today({ id, navigate }) {
@@ -269,6 +293,7 @@ export default function Today({ id, navigate }) {
 
   const [pickedIndex, setPickedIndex] = useState(null) // null follows the clock
   const [itemModal, setItemModal] = useState(null) // { dayId, item? }
+  const swipe = useRef(null)
 
   // The day the trip is on: today, else the next day of the trip, else the last.
   const clockIndex = useMemo(() => {
@@ -316,11 +341,41 @@ export default function Today({ id, navigate }) {
     if (gap?.kind === 'clash') clashing.set(entry, gap)
   })
 
+  // Moves to another day: the old day slides out, the new one in from the
+  // side it lies on.
+  function pickDay(index) {
+    const to = Math.max(0, Math.min(days.length - 1, index ?? clockIndex))
+    if (to === dayIndex) return
+    transition(() => setPickedIndex(index), to > dayIndex ? 'next' : 'prev')
+  }
+
+  // A sideways swipe over the day goes to the day before or after.
+  const swipeHandlers = {
+    onTouchStart: e => {
+      const t = e.touches[0]
+      swipe.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null
+    },
+    onTouchEnd: e => {
+      const start = swipe.current
+      swipe.current = null
+      if (!start) return
+      const t = e.changedTouches[0]
+      const dx = t.clientX - start.x
+      const dy = t.clientY - start.y
+      if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return
+      pickDay(dayIndex + (dx < 0 ? 1 : -1))
+    },
+  }
+
   function setStatus(item, status) {
     const previous = item.status
     const patch = { status }
+    // The last open plan of the day gets a result: the day is complete.
+    const completes = item.status == null && status != null && plan.total - plan.done.length === 1
+    const celebrate = completes && plan.doneCount + (status === 'done' ? 1 : 0) > 0
     dispatch({ type: 'item/update', tripId: trip.id, dayId: day.id, itemId: item.id, patch })
-    toast(STATUS_WORD[status], {
+    if (celebrate) confetti()
+    toast(celebrate ? 'Day complete 🎉' : STATUS_WORD[status], {
       label: 'Undo',
       onClick: () =>
         dispatch({
@@ -368,7 +423,7 @@ export default function Today({ id, navigate }) {
         <div className="mx-auto flex h-12 max-w-2xl items-center gap-1 px-3">
           <button
             className={`${iconBtn} disabled:opacity-30`}
-            onClick={() => setPickedIndex(dayIndex - 1)}
+            onClick={() => pickDay(dayIndex - 1)}
             disabled={dayIndex === 0}
             aria-label="The day before"
           >
@@ -387,13 +442,13 @@ export default function Today({ id, navigate }) {
             <WeatherChip day={weather?.[day.date]} />
           </div>
           {dayIndex !== clockIndex && (
-            <button className={btnChip} onClick={() => setPickedIndex(null)} title="Back to the day the trip is on">
+            <button className={btnChip} onClick={() => pickDay(null)} title="Back to the day the trip is on">
               Now
             </button>
           )}
           <button
             className={`${iconBtn} disabled:opacity-30`}
-            onClick={() => setPickedIndex(dayIndex + 1)}
+            onClick={() => pickDay(dayIndex + 1)}
             disabled={dayIndex === days.length - 1}
             aria-label="The day after"
           >
@@ -402,7 +457,12 @@ export default function Today({ id, navigate }) {
         </div>
       </div>
 
-      <main className="mx-auto max-w-2xl space-y-5 px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-4">
+      <main
+        className="mx-auto max-w-2xl space-y-5 px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-4"
+        style={{ viewTransitionName: 'today-day' }}
+        data-vt-shared
+        {...swipeHandlers}
+      >
         {day.title && <p className="px-1 text-sm font-medium text-slate-500 dark:text-slate-400">{day.title}</p>}
 
         {plan.total === 0 && (

@@ -16,7 +16,10 @@ import {
   IconPlaneTakeoff,
   IconRadar,
   IconXCircle,
+  PopIcon,
+  Strike,
 } from './ui'
+import { vtName } from '../lib/motion'
 
 const STATUS_CYCLE = { undefined: 'done', done: 'skipped', skipped: undefined }
 const STATUS_UI = {
@@ -65,7 +68,9 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
   return (
     <li
       ref={dragRef}
-      style={dragStyle}
+      style={
+        overlay ? dragStyle : { ...dragStyle, viewTransitionName: vtName('plan', item.id), viewTransitionClass: 'plan' }
+      }
       className={`relative flex items-start gap-2 rounded-xl bg-white p-3 ring-1 dark:bg-slate-900 ${
         ghost
           ? 'opacity-40 shadow-sm ring-slate-200 dark:ring-slate-800'
@@ -84,7 +89,7 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
       </button>
 
       <div
-        className={`flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${skipped ? 'opacity-50' : ''}`}
+        className={`flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg outline-none transition-opacity duration-300 focus-visible:ring-2 focus-visible:ring-brand-500 ${skipped ? 'opacity-50' : ''}`}
         onClick={onEdit}
         onKeyDown={onKeyDown}
         role="button"
@@ -98,7 +103,9 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className={`min-w-0 flex-1 truncate font-medium ${skipped ? 'line-through' : ''}`}>{title}</span>
+            <span className="min-w-0 flex-1 truncate font-medium">
+              <Strike on={skipped}>{title}</Strike>
+            </span>
             {times && (
               <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 {times}
@@ -113,7 +120,7 @@ function Card({ trip, item, onEdit, onSetStatus, ghost, overlay, dragRef, dragSt
               aria-label={status.label}
               title={status.label}
             >
-              <status.icon className="size-5.5" />
+              <PopIcon icon={status.icon} state={item.status} className="size-5.5" />
             </button>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">

@@ -7,6 +7,7 @@ import { useStore } from '../lib/store'
 import WeatherChip from './WeatherChip'
 import ItemCard from './ItemCard'
 import { IconBed, IconPencil, IconPlus, IconRoute, IconTrash, iconBtn, useToast } from './ui'
+import { vtName } from '../lib/motion'
 
 export default function DayCard({
   trip,
@@ -26,7 +27,8 @@ export default function DayCard({
   const { setNodeRef, isOver } = useDroppable({ id: day.id })
 
   function setItemStatus(itemId, status) {
-    dispatch({ type: 'item/update', tripId: trip.id, dayId: day.id, itemId, patch: { status } })
+    // no page transition: the circle animates itself, and taps stay quick
+    dispatch({ type: 'item/update', tripId: trip.id, dayId: day.id, itemId, patch: { status }, animate: false })
   }
 
   function deleteDay() {
@@ -43,6 +45,7 @@ export default function DayCard({
   return (
     <section
       id={`day-${day.id}`}
+      style={{ viewTransitionName: vtName('day', day.id) }}
       className={`scroll-mt-18 transition-opacity duration-300 ${isPast ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''}`}
     >
       <div className="mb-2.5 flex items-center gap-2 px-1">
@@ -121,6 +124,7 @@ export default function DayCard({
 
         <button
           onClick={onAddItem}
+          style={{ viewTransitionName: vtName('add', day.id) }}
           className={`${day.items.length > 0 ? 'mt-2 ' : ''}flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-300`}
         >
           <IconPlus className="size-4" />

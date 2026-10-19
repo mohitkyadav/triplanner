@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { missingFrom, PACKING_TEMPLATES } from '../lib/packing'
 import { uid, useStore } from '../lib/store'
-import { IconCheckCircle, IconChevronDown, IconCircle, IconPlus, IconX, iconBtn, inputCls } from './ui'
+import { IconCheckCircle, IconChevronDown, IconCircle, IconPlus, IconX, iconBtn, inputCls, PopIcon, Strike } from './ui'
+import { vtName } from '../lib/motion'
 
 export default function PackingList({ trip }) {
   const { state, dispatch } = useStore()
@@ -39,7 +40,10 @@ export default function PackingList({ trip }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+    <section
+      className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+      style={{ viewTransitionName: 'packing' }}
+    >
       <button
         onClick={() => setOpen(o => !o)}
         className="flex w-full items-center gap-3 px-5 py-3.5 text-left"
@@ -63,7 +67,11 @@ export default function PackingList({ trip }) {
           {list.length > 0 && (
             <ul className="mb-3 space-y-0.5">
               {list.map(p => (
-                <li key={p.id} className="group flex items-center gap-2.5">
+                <li
+                  key={p.id}
+                  className="group flex items-center gap-2.5"
+                  style={{ viewTransitionName: vtName('pack', p.id), viewTransitionClass: 'plan' }}
+                >
                   <button
                     onClick={() => dispatch({ type: 'packing/toggle', tripId: trip.id, itemId: p.id })}
                     className={`shrink-0 rounded-full p-1 transition ${
@@ -73,14 +81,14 @@ export default function PackingList({ trip }) {
                     }`}
                     aria-label={p.done ? `Mark ${p.text} not packed` : `Mark ${p.text} packed`}
                   >
-                    {p.done ? <IconCheckCircle className="size-5" /> : <IconCircle className="size-5" />}
+                    <PopIcon icon={p.done ? IconCheckCircle : IconCircle} state={p.done} className="size-5" />
                   </button>
                   <span
-                    className={`min-w-0 flex-1 truncate py-1 text-sm ${
-                      p.done ? 'text-slate-400 line-through dark:text-slate-500' : ''
+                    className={`min-w-0 flex-1 truncate py-1 text-sm transition-colors duration-300 ${
+                      p.done ? 'text-slate-400 dark:text-slate-500' : ''
                     }`}
                   >
-                    {p.text}
+                    <Strike on={p.done}>{p.text}</Strike>
                   </span>
                   <button
                     onClick={() => dispatch({ type: 'packing/delete', tripId: trip.id, itemId: p.id })}

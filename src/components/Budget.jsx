@@ -33,7 +33,10 @@ export default function BudgetCard({ trip }) {
       : `${fmtMoney(sum.planned, cur)} planned · ${fmtMoney(sum.paid, cur)} paid`
 
   return (
-    <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+    <section
+      className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+      style={{ viewTransitionName: 'budget' }}
+    >
       <button
         onClick={() => setOpen(o => !o)}
         className="flex w-full items-center gap-3 px-5 py-3.5 text-left"

@@ -53,6 +53,7 @@ import { fmtTimes } from '../lib/schedule'
 import { makeDay, placeByTime, sortDays, uid, useStore } from '../lib/store'
 import { computeStays } from '../lib/stays'
 import { useWeather } from '../lib/weather'
+import { vtName } from '../lib/motion'
 
 // The first and the last flight of the trip, for the banner.
 function flightEndpoints(trip) {
@@ -353,9 +354,19 @@ export default function TripView({ id, navigate }) {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-8 px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-5">
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+        <div
+          className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+          style={{ viewTransitionName: vtName('trip', trip.id) }}
+          data-vt-shared
+        >
           <div className="p-5">
-            <h2 className="text-2xl font-bold tracking-tight">{trip.name}</h2>
+            <h2
+              className="w-fit text-2xl font-bold tracking-tight"
+              style={{ viewTransitionName: vtName('trip-title', trip.id) }}
+              data-vt-shared
+            >
+              {trip.name}
+            </h2>
             {trip.destination && (
               <p className="mt-1.5 flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
                 <IconMapPin className="size-4 shrink-0 text-brand-600 dark:text-brand-300" />

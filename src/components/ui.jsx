@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { beforeUpdate, motionOK, vtName } from '../lib/motion'
 
 /* ---------- icons (24px stroke, lucide-style) ---------- */
 
@@ -325,6 +326,17 @@ export const btnChipBrand =
 export const inputCls =
   'w-full rounded-xl border-0 bg-slate-100 px-3.5 py-2.5 text-base text-slate-900 outline-none ring-1 ring-transparent transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-brand-400'
 
+/* An icon that pops when `state` changes — not when it first shows. */
+export function PopIcon({ icon: Icon, state, className = '' }) {
+  const [first] = useState(state)
+  return <Icon key={String(state)} className={state === first ? className : `anim-pop ${className}`} />
+}
+
+/* Text that gets crossed out with a line drawn across it, left to right. */
+export function Strike({ on, children }) {
+  return <span className={`strike ${on ? 'is-struck' : ''}`}>{children}</span>
+}
+
 /* ---------- small form primitives ---------- */
 
 export function Field({ label, children }) {
@@ -362,17 +374,27 @@ export function PickerInput({ type = 'date', value, onChange, placeholder, ...re
   )
 }
 
+/* The options share the width equally, so the highlight is one pill that
+   slides to the chosen one. onChange(value, event). */
 export function Segmented({ options, value, onChange }) {
+  const index = options.findIndex(o => o.value === value)
   return (
-    <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+    <div className="relative flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+      {index >= 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-1 left-1 rounded-lg bg-white shadow-sm transition-transform duration-300 ease-[cubic-bezier(.34,1.3,.64,1)] dark:bg-slate-600"
+          style={{ width: `calc((100% - 0.5rem) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
+        />
+      )}
       {options.map(o => (
         <button
           type="button"
           key={o.value}
-          onClick={() => onChange(o.value)}
-          className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+          onClick={e => onChange(o.value, e)}
+          className={`relative inline-flex flex-1 basis-0 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
             value === o.value
-              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-600 dark:text-white'
+              ? 'text-slate-900 dark:text-white'
               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
@@ -411,6 +433,62 @@ if (typeof window !== 'undefined') {
   })
 }
 
+/* A dialog leaves with an animation even though React removes it at once: a
+   copy of it (the ghost) stays behind just long enough to slide away. When a
+   page transition is about to run — a save that changes the lists — the
+   ghost joins it instead, so both animate together. */
+let ghosts = 0
+function playExit(node) {
+  if (!node?.isConnected || typeof node.animate !== 'function') return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const ghost = node.cloneNode(true)
+  // what the form showed, which a copy does not carry over
+  const fields = node.querySelectorAll('input, textarea, select')
+  ghost.querySelectorAll('input, textarea, select').forEach((el, i) => {
+    if (el.type === 'file') return
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = fields[i].checked
+    else el.value = fields[i].value
+  })
+  const scroller = node.querySelector('[data-scroll]')
+  const scrollTop = scroller?.scrollTop ?? 0
+  // React removes the dialog straight after; one that stays (a remount in
+  // development) is not leaving.
+  queueMicrotask(() => {
+    if (node.isConnected) return
+    ghost.setAttribute('aria-hidden', 'true')
+    ghost.inert = true
+    ghost.style.pointerEvents = 'none'
+    const sheet = ghost.querySelector('[role="dialog"]')
+    const backdrop = ghost.querySelector('[data-backdrop]')
+    sheet.removeAttribute('role')
+    sheet.dataset.vtShared = ''
+    backdrop.dataset.vtShared = ''
+    sheet.classList.remove('anim-sheet')
+    backdrop.classList.remove('anim-backdrop')
+    document.body.appendChild(ghost)
+    const ghostScroller = ghost.querySelector('[data-scroll]')
+    if (ghostScroller) ghostScroller.scrollTop = scrollTop
+
+    const n = ++ghosts
+    if (motionOK() && beforeUpdate(() => ghost.remove())) {
+      sheet.style.viewTransitionName = vtName('sheet-out', n)
+      sheet.style.viewTransitionClass = 'sheet-out'
+      backdrop.style.viewTransitionName = vtName('backdrop-out', n)
+      backdrop.style.viewTransitionClass = 'backdrop-out'
+      return
+    }
+    const phone = !window.matchMedia('(min-width: 640px)').matches
+    const timing = { duration: phone ? 260 : 180, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' }
+    sheet
+      .animate(
+        phone ? [{ transform: 'translateY(100%)' }] : [{ opacity: 0, transform: 'translateY(12px) scale(.97)' }],
+        timing,
+      )
+      .finished.finally(() => ghost.remove())
+    backdrop.animate([{ opacity: 0 }], timing)
+  })
+}
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -420,7 +498,10 @@ export function Modal({ title, onClose, children }) {
   // browser resizes the layout instead (interactive-widget=resizes-content),
   // this stays 0.
   const [kbInset, setKbInset] = useState(0)
+  const rootRef = useRef(null)
   const dialogRef = useRef(null)
+  const backdropRef = useRef(null)
+  const drag = useRef(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
   const titleId = useId()
@@ -446,6 +527,46 @@ export function Modal({ title, onClose, children }) {
       })
     }
   }, [])
+
+  useLayoutEffect(() => {
+    const node = rootRef.current
+    return () => playExit(node)
+  }, [])
+
+  /* On phones the sheet follows a finger pulling its top down, and closes
+     when pulled far or flicked. */
+  const dragProps = {
+    onPointerDown: e => {
+      if (e.pointerType === 'mouse' || e.target.closest('button')) return
+      if (window.matchMedia('(min-width: 640px)').matches) return
+      drag.current = { start: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 }
+      e.currentTarget.setPointerCapture(e.pointerId)
+      dialogRef.current.style.transition = 'none'
+    },
+    onPointerMove: e => {
+      const d = drag.current
+      if (!d) return
+      d.v = (e.clientY - d.y) / Math.max(1, e.timeStamp - d.t)
+      d.y = e.clientY
+      d.t = e.timeStamp
+      const dy = e.clientY - d.start
+      const shown = dy > 0 ? dy : dy / 5 // pulling up only gives a little
+      dialogRef.current.style.transform = `translateY(${shown}px)`
+      backdropRef.current.style.opacity = String(Math.max(0, 1 - dy / dialogRef.current.offsetHeight))
+    },
+    onPointerUp: e => {
+      const d = drag.current
+      drag.current = null
+      if (!d) return
+      const dy = e.clientY - d.start
+      if (dy > 120 || (dy > 30 && d.v > 0.5)) return closeRef.current()
+      const sheet = dialogRef.current
+      sheet.style.transition = 'transform .3s cubic-bezier(.16, 1, .3, 1)'
+      sheet.style.transform = ''
+      backdropRef.current.style.opacity = ''
+    },
+  }
+  dragProps.onPointerCancel = dragProps.onPointerUp
 
   // Focus moves into the dialog, stays there on Tab, and goes back to where
   // it was on close.
@@ -491,10 +612,16 @@ export function Modal({ title, onClose, children }) {
 
   return createPortal(
     <div
+      ref={rootRef}
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
       style={kbInset ? { paddingBottom: kbInset } : undefined}
     >
-      <div className="anim-backdrop absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
+      <div
+        ref={backdropRef}
+        data-backdrop
+        className="anim-backdrop absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <div
         ref={dialogRef}
         role="dialog"
@@ -504,15 +631,20 @@ export function Modal({ title, onClose, children }) {
         className="anim-sheet relative flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-white shadow-xl outline-none sm:max-w-lg sm:rounded-2xl dark:bg-slate-900"
         style={kbInset ? { maxHeight: `calc(100dvh - ${kbInset}px - 1.5rem)` } : undefined}
       >
-        <div className="flex items-center justify-between px-5 pb-1 pt-4">
-          <h2 id={titleId} className="text-lg font-bold">
-            {title}
-          </h2>
-          <button onClick={onClose} className={iconBtn} aria-label="Close">
-            <IconX />
-          </button>
+        <div {...dragProps} className="touch-none sm:touch-auto">
+          <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-slate-300 sm:hidden dark:bg-slate-700" />
+          <div className="flex items-center justify-between px-5 pb-1 pt-2 sm:pt-4">
+            <h2 id={titleId} className="text-lg font-bold">
+              {title}
+            </h2>
+            <button onClick={onClose} className={iconBtn} aria-label="Close">
+              <IconX />
+            </button>
+          </div>
         </div>
-        <div className="overflow-y-auto px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">{children}</div>
+        <div data-scroll className="overflow-y-auto px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
+          {children}
+        </div>
       </div>
     </div>,
     document.body,

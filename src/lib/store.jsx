@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
+import { createContext, useCallback, useContext, useEffect, useReducer, useRef } from 'react'
 import { readMirror, requestPersistence, scheduleBackup } from './backup'
 import { addDaysISO, daysBetween } from './dates'
 import { collectUnusedFiles } from './files'
 import { normalizeTrips, upgradeItem } from './io'
+import { transition } from './motion'
 import { startOf } from './schedule'
 import { uid } from './uid'
 
@@ -243,8 +244,34 @@ const SAVE_DELAY = 250
 
 const StoreCtx = createContext(null)
 
+/* Changes a person makes to what lists show — a plan or day added, deleted
+   or moved, a trip's dates changed — animate: the rows glide to where they
+   now belong (see lib/motion.js). A drag already animates itself, and
+   changes from sync or another tab should not move the page under someone.
+   `animate: false` on an action opts out. */
+const ANIMATED = new Set([
+  'trip/create',
+  'trip/update',
+  'trip/delete',
+  'trip/restore',
+  'day/add',
+  'day/update',
+  'day/delete',
+  'item/add',
+  'item/update',
+  'item/delete',
+  'packing/add',
+  'packing/addMany',
+  'packing/delete',
+  'data/import',
+])
+
 export function StoreProvider({ children, onRecover }) {
-  const [state, dispatch] = useReducer(reducer, null, load)
+  const [state, apply] = useReducer(reducer, null, load)
+  const dispatch = useCallback(
+    action => (ANIMATED.has(action.type) && action.animate !== false ? transition(() => apply(action)) : apply(action)),
+    [],
+  )
   const recovered = useRef(false)
   const fromOtherTab = useRef(false)
   const unsaved = useRef(null)
@@ -291,7 +318,7 @@ export function StoreProvider({ children, onRecover }) {
         if (!Array.isArray(data?.trips)) return
         fromOtherTab.current = true
         unsaved.current = null
-        dispatch({ type: 'data/replace', trips: migrate(data.trips) })
+        apply({ type: 'data/replace', trips: migrate(data.trips) })
       } catch {
         // a damaged value — keep what this tab has
       }
@@ -316,7 +343,7 @@ export function StoreProvider({ children, onRecover }) {
       .then(snapshot => {
         if (!snapshot?.trips?.length) return
         const trips = normalizeTrips(snapshot)
-        dispatch({ type: 'data/import', trips })
+        apply({ type: 'data/import', trips })
         onRecover?.(trips.length)
       })
       .catch(() => {

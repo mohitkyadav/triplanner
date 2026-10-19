@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Inbox from './components/Inbox'
 import ShareReceive from './components/ShareReceive'
 import { ToastProvider, btnChipBrand, useToast } from './components/ui'
+import { transition } from './lib/motion'
 import { StoreProvider, useStore } from './lib/store'
 import { SyncEngine, useSignInReturn } from './lib/sync'
 import { currentTrip } from './lib/trips'
@@ -10,25 +11,42 @@ import Home from './pages/Home'
 import Today from './pages/Today'
 import TripView from './pages/TripView'
 
+// How deep a page sits: home, a trip, its trip mode.
+const depth = route => (route.match(/^\/trip\/[^/]+(\/today)?$/) ? (route.endsWith('/today') ? 2 : 1) : 0)
+
 function useHashRoute() {
   const [route, setRoute] = useState(() => location.hash.replace(/^#/, ''))
+  const current = useRef(route)
+
+  /* A page change animates: deeper pages slide in from the side, Back slides
+     them away, and a trip card grows into its page (see lib/motion.js). */
+  const go = useCallback(path => {
+    const from = current.current
+    if (path === from) return
+    current.current = path
+    transition(() => setRoute(path), depth(path) < depth(from) ? 'back' : 'page')
+  }, [])
+
   useEffect(() => {
-    const onChange = () => setRoute(location.hash.replace(/^#/, ''))
+    const onChange = () => go(location.hash.replace(/^#/, ''))
     window.addEventListener('hashchange', onChange)
     window.addEventListener('popstate', onChange)
     return () => {
       window.removeEventListener('hashchange', onChange)
       window.removeEventListener('popstate', onChange)
     }
-  }, [])
+  }, [go])
   /* A page change made from inside a dialog replaces the dialog's history
      entry, so Back from the new page does not land on a closed dialog. */
-  const navigate = useCallback((path, { replace = false } = {}) => {
-    const url = path ? `#${path}` : location.pathname + location.search // no dangling '#'
-    if (replace || history.state?.dialog) history.replaceState(null, '', url)
-    else history.pushState(null, '', url)
-    setRoute(path)
-  }, [])
+  const navigate = useCallback(
+    (path, { replace = false } = {}) => {
+      const url = path ? `#${path}` : location.pathname + location.search // no dangling '#'
+      if (replace || history.state?.dialog) history.replaceState(null, '', url)
+      else history.pushState(null, '', url)
+      go(path)
+    },
+    [go],
+  )
   return [route, navigate]
 }
 
@@ -68,9 +86,7 @@ function Routes() {
     count => toast(`Restored ${count} trip${count === 1 ? '' : 's'} from the copy on this device`),
     [toast],
   )
-  useSignInReturn(
-    useCallback(why => toast(`That sign-in link did not work: ${why}. Ask for a new one.`), [toast]),
-  )
+  useSignInReturn(useCallback(why => toast(`That sign-in link did not work: ${why}. Ask for a new one.`), [toast]))
 
   return (
     <StoreProvider onRecover={onRecover}>

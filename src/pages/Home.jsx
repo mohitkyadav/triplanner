@@ -22,6 +22,7 @@ import { downloadJSON, exportPayload, parseImport } from '../lib/io'
 import { makeTrip, useStore } from '../lib/store'
 import { countdown, groupTrips, tripPhase } from '../lib/trips'
 import { useWeatherEnabled } from '../lib/weather'
+import { vtName } from '../lib/motion'
 
 const GROUP_TITLE = { ongoing: 'Under way', upcoming: 'Upcoming', undated: 'No dates yet', past: 'Past trips' }
 
@@ -42,13 +43,21 @@ function TripRow({ trip, navigate, onDelete }) {
       role="link"
       tabIndex={0}
       aria-label={`Open ${trip.name}`}
+      style={{ viewTransitionName: vtName('trip', trip.id) }}
+      data-vt-shared
       className={`group cursor-pointer rounded-2xl bg-white p-4 shadow-sm outline-none ring-1 transition hover:shadow-md hover:ring-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-slate-900 dark:hover:ring-brand-600 ${
         phase.phase === 'ongoing' ? 'ring-brand-300 dark:ring-brand-600' : 'ring-slate-200 dark:ring-slate-800'
       } ${phase.phase === 'past' ? 'opacity-75' : ''}`}
     >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-lg font-semibold">{trip.name}</h3>
+          <h3
+            className="w-fit max-w-full truncate text-lg font-semibold"
+            style={{ viewTransitionName: vtName('trip-title', trip.id) }}
+            data-vt-shared
+          >
+            {trip.name}
+          </h3>
           {trip.destination && (
             <p className="truncate text-sm text-slate-500 dark:text-slate-400">{trip.destination}</p>
           )}

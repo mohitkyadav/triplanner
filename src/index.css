@@ -59,3 +59,174 @@ body {
 .anim-toast {
   animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* ---------- motion ----------
+   Small reactions are CSS on the element. Moves between states — a page, a
+   day, a plan changing place — are View Transitions (src/lib/motion.js): the
+   browser snapshots before and after, and these rules say how the two meet.
+   <html data-vt="…"> names the kind of move while it runs. */
+
+@keyframes pop {
+  0% {
+    transform: scale(0.55);
+  }
+  60% {
+    transform: scale(1.2);
+  }
+}
+.anim-pop {
+  animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* crossing out draws a line across the text, left to right */
+.strike {
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 0% 1.5px;
+  transition: background-size 0.35s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.strike.is-struck {
+  background-size: 100% 1.5px;
+}
+
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-grow-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+@keyframes vt-shrink-out {
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+@keyframes vt-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+@keyframes vt-to-left {
+  to {
+    opacity: 0;
+    transform: translateX(-48px);
+  }
+}
+@keyframes vt-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-48px);
+  }
+}
+@keyframes vt-to-right {
+  to {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+@keyframes vt-sheet-down {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes vt-sheet-away {
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+}
+@keyframes vt-reveal {
+  from {
+    clip-path: circle(0 at var(--reveal-x, 50%) var(--reveal-y, 50%));
+  }
+  to {
+    clip-path: circle(var(--reveal-r, 150vmax) at var(--reveal-x, 50%) var(--reveal-y, 50%));
+  }
+}
+
+::view-transition-group(*) {
+  animation-duration: 0.4s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* a plan, packing item or row that arrives grows in; one that goes shrinks away */
+::view-transition-new(.plan):only-child {
+  animation: vt-grow-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+::view-transition-old(.plan):only-child {
+  animation: vt-shrink-out 0.22s ease-in both;
+}
+
+/* a closing dialog that rides along with a change: down on phones, away on desktop */
+::view-transition-old(.sheet-out) {
+  animation: vt-sheet-down 0.26s cubic-bezier(0.4, 0, 1, 1) both;
+}
+::view-transition-old(.backdrop-out) {
+  animation: vt-fade-out 0.24s ease-in both;
+}
+@media (min-width: 640px) {
+  ::view-transition-old(.sheet-out) {
+    animation: vt-sheet-away 0.18s ease-in both;
+  }
+}
+
+/* Moving to another page or day moves everything as one, except what is
+   marked data-vt-shared: the trip card that grows into its page. */
+html:is([data-vt='page'], [data-vt='back'], [data-vt='next'], [data-vt='prev'])
+  [style*='view-transition-name']:not([data-vt-shared]) {
+  view-transition-name: none !important;
+}
+html[data-vt='page']::view-transition-old(root) {
+  animation: vt-to-left 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+}
+html[data-vt='page']::view-transition-new(root) {
+  animation: vt-from-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+html[data-vt='back']::view-transition-old(root) {
+  animation: vt-to-right 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+}
+html[data-vt='back']::view-transition-new(root) {
+  animation: vt-from-left 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+html[data-vt='next']::view-transition-old(today-day) {
+  animation: vt-to-left 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+}
+html[data-vt='next']::view-transition-new(today-day) {
+  animation: vt-from-right 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+html[data-vt='prev']::view-transition-old(today-day) {
+  animation: vt-to-right 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+}
+html[data-vt='prev']::view-transition-new(today-day) {
+  animation: vt-from-left 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+html:is([data-vt='next'], [data-vt='prev'])::view-transition-group(today-day) {
+  animation: none; /* the day only slides, its height just changes */
+}
+
+/* a new theme spreads out in a circle from the switch */
+html[data-vt='theme'] [style*='view-transition-name'] {
+  view-transition-name: none !important;
+}
+html[data-vt='theme']::view-transition-old(root) {
+  animation: none;
+}
+html[data-vt='theme']::view-transition-new(root) {
+  animation: vt-reveal 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  mix-blend-mode: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-pop,
+  .anim-sheet,
+  .anim-toast {
+    animation: none;
+  }
+  .strike {
+    transition: none;
+  }
+}
