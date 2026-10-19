@@ -3,6 +3,7 @@ import Inbox from './components/Inbox'
 import ShareReceive from './components/ShareReceive'
 import { ToastProvider, btnChipBrand, useToast } from './components/ui'
 import { StoreProvider, useStore } from './lib/store'
+import { SyncEngine, useSignInReturn } from './lib/sync'
 import { currentTrip } from './lib/trips'
 import { useUpdateReady } from './lib/update'
 import Home from './pages/Home'
@@ -67,9 +68,13 @@ function Routes() {
     count => toast(`Restored ${count} trip${count === 1 ? '' : 's'} from the copy on this device`),
     [toast],
   )
+  useSignInReturn(
+    useCallback(why => toast(`That sign-in link did not work: ${why}. Ask for a new one.`), [toast]),
+  )
 
   return (
     <StoreProvider onRecover={onRecover}>
+      <SyncEngine />
       {route === '/today' ? (
         <TodayShortcut navigate={navigate} />
       ) : todayMatch ? (

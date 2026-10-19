@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import Account, { AccountMenu } from '../components/Account'
 import DataSafety from '../components/DataSafety'
 import ScanModal from '../components/ScanModal'
 import ThemeSwitcher from '../components/ThemeSwitcher'
@@ -178,6 +179,7 @@ export default function Home({ navigate }) {
               New trip
             </button>
           )}
+          <AccountMenu />
         </div>
       </header>
 
@@ -228,6 +230,8 @@ export default function Home({ navigate }) {
             </div>
           </>
         )}
+
+        <Account />
 
         <div className="mt-10 space-y-4">
           <ThemeSwitcher />

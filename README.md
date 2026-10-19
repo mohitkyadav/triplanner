@@ -1,7 +1,7 @@
 # Triplanner ✈️
 
 An offline-first PWA for planning trips day by day. Everything stays on your
-device; nothing is uploaded.
+device; signing in (optional) syncs your trips between devices.
 
 ## Features
 
@@ -34,6 +34,10 @@ device; nothing is uploaded.
 - **Share** — the trip travels inside the link, or as a QR code the built-in
   scanner reads. No server. Leave out costs or notes if you like. Receiving a
   trip you already have offers *Keep both* or *Replace mine*.
+- **Sync** — sign in with an emailed link and the trips follow you to every
+  device. One account for all the chapri apps (Supabase project
+  `chapri-apps`). Offline still works; changes go up when you are back.
+  Documents stay on the device that added them.
 - **Backup** — an automatic backup file, a copy on the device, storage
   protection and an install prompt, in one card.
 - Costs per plan/day/trip · day routes in Maps · live flight status links ·
@@ -63,6 +67,11 @@ load only when you share or scan. New app versions wait for a tap on
 The tests in `src/test/` render the whole app on a seeded device and drive it
 like a user; there are deliberately no unit tests.
 
+Sync needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` — in
+`.env.local` for dev, in the Netlify site's environment for deploys. Both are
+public by design (row-level security guards the data); without them the app
+runs with no sync. The schema lives in the `chapri-apps` repo.
+
 Deploy: `netlify.toml` is ready — point Netlify at the repo, or run
 `npx netlify-cli deploy --prod`.
 
@@ -76,6 +85,7 @@ Deploy: `netlify.toml` is ready — point Netlify at the repo, or run
 | Budget | `lib/money.js` — conversion with `trip.rates`, the split and the settle-up |
 | Weather | `lib/weather.js` — Open-Meteo geocoding + forecast, cached for offline |
 | Inbox | `lib/inbox.js` + `public/share-target-sw.js` — files shared to the app (share target) or opened with it (file handlers) |
+| Sync | `lib/sync.jsx` — per-trip merge with the account (`triplanner_trips`): the side that changed wins, the newer edit if both did; deletes travel as tombstones. Uploads 2 s after an edit, on focus, on reconnect and every 5 min. |
 | Durability | `lib/backup.js` — IndexedDB copy after every change, plus an optional backup file (File System Access). Restores itself if `localStorage` is ever empty; follows deletions, so a delete stays deleted. |
 | Booking reader | `lib/booking.js` — the RFC 5545 subset a confirmation uses. Times are taken as written; only UTC is converted, and flagged. |
 | Map links | `lib/maps.js` — every map link, no API key |

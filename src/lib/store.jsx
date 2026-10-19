@@ -11,7 +11,7 @@ export const KEY = 'triplanner:v1'
 export { uid }
 
 // Data an older version wrote is brought up to date once, when it loads.
-const migrate = trips =>
+export const migrate = trips =>
   trips.map(trip => ({
     ...trip,
     days: (trip.days ?? []).map(day => ({ ...day, items: (day.items ?? []).map(upgradeItem) })),
@@ -126,7 +126,8 @@ function reducer(state, a) {
     case 'trip/delete':
       return { ...state, trips: state.trips.filter(t => t.id !== a.id) }
     case 'trip/restore':
-      return { ...state, trips: insertAt(state.trips, a.trip, a.index) }
+      // Newer than the delete, so a synced copy follows the Undo too.
+      return { ...state, trips: insertAt(state.trips, touch(a.trip), a.index) }
     case 'day/add':
       return mapTrip(state, a.tripId, t => ({ ...t, days: sortDays([...t.days, a.day]) }))
     case 'day/update':
@@ -217,6 +218,15 @@ function reducer(state, a) {
       const existing = new Set(state.trips.map(t => t.id))
       const added = a.trips.filter(t => !existing.has(t.id))
       return { trips: [...added, ...merged] }
+    }
+    case 'sync/apply': {
+      // Trips from the account: newer copies replace these, new ones are added,
+      // ones deleted elsewhere go. Their updatedAt stays as the account has it.
+      const incoming = new Map(a.trips.map(t => [t.id, t]))
+      const gone = new Set(a.remove)
+      const kept = state.trips.filter(t => !gone.has(t.id)).map(t => incoming.get(t.id) ?? t)
+      const have = new Set(state.trips.map(t => t.id))
+      return { trips: [...a.trips.filter(t => !have.has(t.id)), ...kept] }
     }
     case 'data/replace':
       // Another tab saved: its state is the latest.
