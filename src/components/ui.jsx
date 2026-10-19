@@ -336,12 +336,13 @@ export function Field({ label, children }) {
   )
 }
 
-/* Native date/time input, normalized. iOS Safari gives empty pickers no
-   placeholder and no icon (they render as a blank pill) and an intrinsic
-   width that overflows narrow grid cells — so we reset appearance, overlay
-   our own placeholder + icon, and leave the native picker interaction
-   untouched. On desktop browsers the built-in segments/indicator are hidden
-   while empty and unfocused so the overlay placeholder shows instead. */
+/* The device's own date/time input and picker. `color-scheme` makes the
+   browser draw its field text, icon and popup in the app's theme.
+
+   iOS Safari is the one browser that needs help: an empty field there is a
+   blank pill with no format hint or icon, and its intrinsic width overflows
+   narrow grid cells. Only on iOS (`-webkit-touch-callout` is iOS-only) we
+   reset its appearance and show our own placeholder and icon. */
 export function PickerInput({ type = 'date', value, onChange, placeholder, ...rest }) {
   const Icon = type === 'time' ? IconClock : IconCalendar
   return (
@@ -350,17 +351,13 @@ export function PickerInput({ type = 'date', value, onChange, placeholder, ...re
         type={type}
         value={value}
         onChange={onChange}
-        className={`${inputCls} peer min-h-11 min-w-0 appearance-none pr-10 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:size-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 ${
-          value ? '' : 'text-transparent focus:text-slate-900 dark:focus:text-slate-100'
-        }`}
+        className={`${inputCls} min-h-11 min-w-0 scheme-light dark:scheme-dark [&::-webkit-calendar-picker-indicator]:cursor-pointer supports-[-webkit-touch-callout:none]:appearance-none supports-[-webkit-touch-callout:none]:pr-10 [&::-webkit-date-and-time-value]:text-left`}
         {...rest}
       />
-      {!value && (
-        <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-base text-slate-400 peer-focus:hidden">
-          {placeholder ?? (type === 'time' ? 'Select time' : 'Select date')}
-        </span>
-      )}
-      <Icon className="pointer-events-none absolute right-3.5 top-1/2 size-4.5 -translate-y-1/2 text-slate-400" />
+      <span className="pointer-events-none absolute inset-0 hidden items-center justify-between px-3.5 text-base text-slate-400 supports-[-webkit-touch-callout:none]:flex">
+        <span>{value ? '' : (placeholder ?? (type === 'time' ? 'Select time' : 'Select date'))}</span>
+        <Icon className="size-4.5" />
+      </span>
     </div>
   )
 }
