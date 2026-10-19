@@ -147,4 +147,26 @@ describe('Triplanner', () => {
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(await screen.findByRole('button', { name: 'Edit Dinner at Ramiro' })).toBeInTheDocument()
   })
+
+  it('fills in the airports from the flight number', async () => {
+    const user = userEvent.setup()
+    const airport = (municipality, iata_code) => ({ municipality, iata_code, name: `${municipality} Airport` })
+    const flightroute = { origin: airport('Frankfurt am Main', 'FRA'), destination: airport('Porto', 'OPO') }
+    fetch.mockImplementation(url =>
+      url === 'https://api.adsbdb.com/v0/callsign/LH1178'
+        ? Promise.resolve(new Response(JSON.stringify({ response: { flightroute } })))
+        : Promise.reject(new Error('offline in tests')),
+    )
+    openApp([lisbon()], '/trip/trip-1')
+
+    await user.click(screen.getByRole('button', { name: 'Edit Dinner at Ramiro' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit plan' })
+    await user.click(within(dialog).getByRole('radio', { name: /Flight/ }))
+    await user.type(within(dialog).getByLabelText('Flight number'), 'lh 1178')
+
+    await waitFor(() => expect(within(dialog).getByLabelText('From')).toHaveValue('Frankfurt am Main (FRA)'))
+    expect(within(dialog).getByLabelText('To')).toHaveValue('Porto (OPO)')
+    // Asked once the typing settled, not on every key.
+    expect(fetch.mock.calls.filter(([url]) => url.includes('adsbdb'))).toHaveLength(1)
+  })
 })

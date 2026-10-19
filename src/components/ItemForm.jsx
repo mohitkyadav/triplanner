@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { airlineFromFlightNo } from '../lib/airlines'
+import { airlineFromFlightNo, callsign } from '../lib/airlines'
 import { CATEGORIES } from '../lib/categories'
 import { fmtDate } from '../lib/dates'
+import { useFlightRoute } from '../lib/flightRoute'
 import { placeLinks } from '../lib/maps'
 import AirlineLogo from './AirlineLogo'
 import { DocumentList } from './Documents'
 import {
+  btnChip,
   btnDanger,
   btnGhost,
   btnPrimary,
@@ -56,6 +58,9 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
     to: initial?.to ?? '',
     hotelAction: initial?.hotelAction === 'check-out' ? 'check-out' : 'check-in',
   })
+  // The flight number whose usual route has been looked at.
+  const [routeFor, setRouteFor] = useState(null)
+  const [filled, setFilled] = useState(null) // the route the airports were filled from
   const set = k => e =>
     setF(prev => ({ ...prev, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
 
@@ -97,6 +102,18 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
   const titlePlaceholder =
     type === 'flight' ? 'e.g. Off to Lisbon' : type === 'hotel' ? 'e.g. Hotel Alfama' : 'e.g. Louvre Museum'
   const airline = type === 'flight' ? airlineFromFlightNo(f.flightNo) : null
+  const route = useFlightRoute(type === 'flight' ? f.flightNo : '')
+  const code = callsign(f.flightNo)
+  const shows = r => r && f.from === r.from && f.to === r.to
+  // A new number with a known route fills the airports when they are empty or
+  // still what an earlier number filled in. Typed airports are never
+  // overwritten; the route is offered next to them instead.
+  if (route && code !== routeFor) {
+    setRouteFor(code)
+    const free = (!f.from.trim() && !f.to.trim()) || shows(filled)
+    if (free) setF(prev => ({ ...prev, from: route.from, to: route.to }))
+    setFilled(free ? route : null)
+  }
   // What the map buttons will do, shown live under the field.
   const mapHint = placeLinks(trip, { type, title: f.title, from: f.from, to: f.to, place: f.place }) ?? {}
   const otherDays = days && days.length > 1
@@ -207,6 +224,24 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
                 <PickerInput type="time" value={f.endTime} onChange={set('endTime')} />
               </Field>
             </div>
+            {route && !shows(route) && (
+              <button
+                type="button"
+                className={btnChip}
+                onClick={() => {
+                  setF(prev => ({ ...prev, from: route.from, to: route.to }))
+                  setFilled(route)
+                }}
+              >
+                Use {route.from} → {route.to}
+              </button>
+            )}
+            {shows(filled) && (
+              <p className="-mt-2.5 text-[13px] text-slate-400 dark:text-slate-500">
+                Filled in from this flight’s usual route (adsbdb.com). Check it against your booking, and add the times
+                yourself.
+              </p>
+            )}
           </>
         )}
 

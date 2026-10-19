@@ -9,7 +9,9 @@ device; signing in (optional) syncs your trips between devices.
   Change the dates later and the days follow: the plans move with the trip,
   or keep their dates — your choice. Plans sit in time order.
 - **Start and end times** — a plan can say when it ends; a flight is one plan
-  from → to, leaving and landing. Overlaps are flagged.
+  from → to, leaving and landing. Overlaps are flagged. Type a flight number
+  and its usual airports fill in, from adsbdb.com (no key; only the flight
+  number is sent). It has no times, so those stay yours to enter.
 - **Trip mode** — during the trip, on the trip's own clock (set a time zone
   per trip): the plan you are on, when it ends, what comes next, the free
   time between, directions for the hop, your documents, one tap to mark it
@@ -84,6 +86,7 @@ Deploy: `netlify.toml` is ready — point Netlify at the repo, or run
 | Dates | `lib/reschedule.js` — new trip dates shift or keep the days; empty days outside the range go, days with plans stay |
 | Budget | `lib/money.js` — conversion with `trip.rates`, the split and the settle-up |
 | Weather | `lib/weather.js` — Open-Meteo geocoding + forecast, cached for offline |
+| Flight route | `lib/flightRoute.js` — a flight number's usual airports from adsbdb.com, cached for offline |
 | Inbox | `lib/inbox.js` + `public/share-target-sw.js` — files shared to the app (share target) or opened with it (file handlers) |
 | Sync | `lib/sync.jsx` — per-trip merge with the account (`triplanner_trips`): the side that changed wins, the newer edit if both did; deletes travel as tombstones. Uploads 2 s after an edit, on focus, on reconnect and every 5 min. |
 | Durability | `lib/backup.js` — IndexedDB copy after every change, plus an optional backup file (File System Access). Restores itself if `localStorage` is ever empty; follows deletions, so a delete stays deleted. |
