@@ -150,12 +150,70 @@ async function refreshUser() {
   if (!error && data.user && session) setSession({ ...session, user: data.user })
 }
 
+/* ---------- approval ---------- */
+
+// Sync costs something, so it is for active members only: a new account is
+// 'pending' until the owner approves it in the backend (public.members). The
+// server enforces it; the app follows along so it can say "waiting for
+// approval" instead of failing. null until known.
+const MEMBERSHIP_KEY = 'triplanner:membership'
+let membership = null
+const membershipListeners = new Set()
+function setMembership(next) {
+  membership = next
+  membershipListeners.forEach(l => l())
+}
+const subscribeMembership = l => {
+  membershipListeners.add(l)
+  return () => membershipListeners.delete(l)
+}
+export const useMembership = () => useSyncExternalStore(subscribeMembership, () => membership)
+
+// The last status seen, so an offline start knows it too.
+function readMembership(userId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(MEMBERSHIP_KEY))
+    return saved?.userId === userId && (saved.status === 'active' || saved.status === 'pending') ? saved.status : null
+  } catch {
+    return null
+  }
+}
+
+async function refreshMembership() {
+  const userId = session?.user?.id
+  if (!userId) return
+  const { data, error } = await supabase.from('members').select('status').eq('user_id', userId).maybeSingle()
+  if (error || userId !== session?.user?.id) return // offline or signed out meanwhile: keep what we knew
+  const status = data?.status === 'active' ? 'active' : 'pending'
+  setMembership(status)
+  try {
+    localStorage.setItem(MEMBERSHIP_KEY, JSON.stringify({ userId, status }))
+  } catch {
+    // storage unavailable — it is read again on the next start
+  }
+}
+
 if (supabase) {
   supabase.auth.onAuthStateChange((event, next) => {
+    if (next?.user?.id !== session?.user?.id) setMembership(next ? readMembership(next.user.id) : null)
     setSession(next)
-    if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') setTimeout(refreshUser, 0)
+    // Outside the callback: calling the client from inside it can deadlock.
+    if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+      setTimeout(() => {
+        refreshUser()
+        refreshMembership()
+      }, 0)
+    }
   })
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && refreshUser())
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return
+    refreshUser()
+    refreshMembership()
+  })
+  // Waiting for approval: notice it soon after it happens, while the app is open.
+  setInterval(() => {
+    if (document.visibilityState === 'visible' && session && membership === 'pending') refreshMembership()
+  }, POLL_EVERY)
 }
 
 export const useSession = () => useSyncExternalStore(subscribeSession, () => session)
@@ -217,7 +275,9 @@ export async function signOut() {
 export function SyncEngine() {
   const { state, dispatch } = useStore()
   const session = useSession()
-  const userId = session?.user?.id
+  const membership = useMembership()
+  // Sync runs for active members only.
+  const userId = membership === 'active' ? session?.user?.id : undefined
   const latest = useRef(state.trips)
   latest.current = state.trips
   const prevIds = useRef(null)
@@ -305,6 +365,8 @@ export function SyncEngine() {
         }
         setStatus({ state: 'synced', at: new Date().toISOString(), error: null })
       } catch (err) {
+        // Refused by the server's rules: the account may have been set back to pending.
+        if (err?.code === '42501') refreshMembership()
         setStatus({ state: navigator.onLine ? 'error' : 'offline', error: err?.message ?? String(err) })
       } finally {
         running = false

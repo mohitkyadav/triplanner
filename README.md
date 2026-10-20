@@ -51,7 +51,9 @@ device; signing in (optional) syncs your trips between devices.
 - **Sync** — sign in with an emailed code (or link) and the trips follow you to every
   device. One account for all the chapri apps (Supabase project
   `chapri-apps`). Offline still works; changes go up when you are back.
-  Documents stay on the device that added them.
+  Documents stay on the device that added them. A new account is *pending*
+  until it is approved in the backend (`public.members`); until then the
+  avatar shows an amber dot and nothing syncs.
 - **Backup** — an automatic backup file, a copy on the device, storage
   protection and an install prompt, in one card.
 - Costs per plan/day/trip · day routes in Maps · live flight status links ·

@@ -7,6 +7,7 @@ import {
   sendLink,
   signOut,
   syncEnabled,
+  useMembership,
   useSession,
   useSyncStatus,
   verifyCode,
@@ -16,7 +17,8 @@ import { IconLogIn, IconLogOut, IconPencil, IconRotate, btnChip, btnChipBrand, i
 // One account for all chapri apps. Signed in, the trips sync between devices;
 // signed out, the app is the same offline app.
 
-function statusLine(sync) {
+function statusLine(state, sync) {
+  if (state === 'pending') return 'Waiting for approval — sync turns on once your account is approved'
   if (sync.state === 'syncing') return 'Syncing…'
   if (sync.state === 'offline') return 'Offline — changes sync when you are back online'
   if (sync.state === 'error') return 'Sync failed — it tries again on the next change'
@@ -120,19 +122,28 @@ function SignIn() {
 }
 
 const DOT = {
+  pending: 'bg-amber-500',
   synced: 'bg-emerald-500',
   syncing: 'bg-brand-500 animate-pulse',
   offline: 'bg-slate-400',
   error: 'bg-rose-500',
   off: 'bg-slate-400',
 }
-const SHORT = { synced: 'Synced', syncing: 'Syncing…', offline: 'Offline', error: 'Sync failed', off: 'Connected' }
+const SHORT = {
+  pending: 'Waiting for approval',
+  synced: 'Synced',
+  syncing: 'Syncing…',
+  offline: 'Offline',
+  error: 'Sync failed',
+  off: 'Connected',
+}
 
 // Signed in: a small account button in the navbar — the sync state at a
 // glance, and the account behind a tap.
 export function AccountMenu() {
   const session = useSession()
   const sync = useSyncStatus()
+  const membership = useMembership()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const close = () => {
@@ -155,7 +166,8 @@ export function AccountMenu() {
   if (!syncEnabled || !session) return null
   const email = session.user.email ?? ''
   const name = displayName(session.user)
-  const state = sync.state in DOT ? sync.state : 'off'
+  // A pending account has nothing to sync yet: its badge says so instead.
+  const state = membership === 'pending' ? 'pending' : sync.state in DOT ? sync.state : 'off'
 
   return (
     <div className="relative">
@@ -219,18 +231,20 @@ export function AccountMenu() {
                 title={state === 'error' ? sync.error : undefined}
               >
                 <span className={`size-1.5 shrink-0 rounded-full ${DOT[state]}`} />
-                {statusLine(sync)}
+                {statusLine(state, sync)}
               </p>
             </div>
             <div className="py-1">
-              <button
-                onClick={() => requestSync()}
-                disabled={state === 'syncing'}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <IconRotate className={`size-4 shrink-0 ${state === 'syncing' ? 'animate-spin' : ''}`} />
-                Sync now
-              </button>
+              {membership === 'active' && (
+                <button
+                  onClick={() => requestSync()}
+                  disabled={state === 'syncing'}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <IconRotate className={`size-4 shrink-0 ${state === 'syncing' ? 'animate-spin' : ''}`} />
+                  Sync now
+                </button>
+              )}
               <button
                 onClick={() => {
                   close()
