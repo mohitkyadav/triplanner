@@ -61,6 +61,28 @@ export const IconMapPin = p => (
     <circle cx="12" cy="10" r="2.5" />
   </Svg>
 )
+export const IconMap = p => (
+  <Svg {...p}>
+    <path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" />
+    <path d="M9 4v13M15 6.5v13" />
+  </Svg>
+)
+export const IconLayers = p => (
+  <Svg {...p}>
+    <path d="m12 3 9 5-9 5-9-5 9-5z" />
+    <path d="m3 13 9 5 9-5" />
+  </Svg>
+)
+export const IconExpand = p => (
+  <Svg {...p}>
+    <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+  </Svg>
+)
+export const IconShrink = p => (
+  <Svg {...p}>
+    <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+  </Svg>
+)
 export const IconGrip = p => (
   <Svg {...p} stroke="none" fill="currentColor">
     <circle cx="9" cy="6" r="1.4" />
@@ -539,21 +561,12 @@ function playExit(node) {
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export function Modal({ title, onClose, children }) {
-  // Height of the on-screen keyboard overlapping the layout viewport (iOS
-  // Safari keeps position:fixed anchored behind the keyboard). Where the
-  // browser resizes the layout instead (interactive-widget=resizes-content),
-  // this stays 0.
-  const [kbInset, setKbInset] = useState(0)
-  const rootRef = useRef(null)
-  const dialogRef = useRef(null)
-  const backdropRef = useRef(null)
-  const drag = useRef(null)
+/* Makes something a dialog for the Back button and Escape: while it is up,
+   it owns one history entry, Back or Escape close the innermost one only,
+   and the page behind does not scroll. Returns a ref to the latest onClose. */
+export function useDismiss(onClose) {
   const closeRef = useRef(onClose)
   closeRef.current = onClose
-  const titleId = useId()
-
-  // Back button + Escape close the innermost dialog only.
   useEffect(() => {
     const entry = closeRef
     openDialogs.push(entry)
@@ -574,6 +587,21 @@ export function Modal({ title, onClose, children }) {
       })
     }
   }, [])
+  return closeRef
+}
+
+export function Modal({ title, onClose, children }) {
+  // Height of the on-screen keyboard overlapping the layout viewport (iOS
+  // Safari keeps position:fixed anchored behind the keyboard). Where the
+  // browser resizes the layout instead (interactive-widget=resizes-content),
+  // this stays 0.
+  const [kbInset, setKbInset] = useState(0)
+  const rootRef = useRef(null)
+  const dialogRef = useRef(null)
+  const backdropRef = useRef(null)
+  const drag = useRef(null)
+  const closeRef = useDismiss(onClose)
+  const titleId = useId()
 
   useLayoutEffect(() => {
     const node = rootRef.current
@@ -642,7 +670,7 @@ export function Modal({ title, onClose, children }) {
       document.removeEventListener('keydown', onKey)
       if (before?.isConnected) before.focus?.({ preventScroll: true })
     }
-  }, [])
+  }, [closeRef])
 
   useEffect(() => {
     const vv = window.visualViewport

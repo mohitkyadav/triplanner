@@ -77,7 +77,16 @@ function normalizeItem(raw) {
       hotelAction: i.hotelAction === 'check-out' ? 'check-out' : 'check-in',
     }),
     ...(attachments.length > 0 && { attachments }),
+    ...(geo(i.geo) && { geo: geo(i.geo) }),
   }
+}
+
+// Where a plan is on the map: { lat, lng, label?, guess? }.
+function geo(g) {
+  const lat = Number(g?.lat)
+  const lng = Number(g?.lng)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
+  return { lat, lng, ...(str(g.label) && { label: str(g.label) }), ...(g.guess === true && { guess: true }) }
 }
 
 function normalizeDay(d) {

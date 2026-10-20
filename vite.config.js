@@ -17,6 +17,32 @@ export default defineConfig({
         importScripts: ['share-target-sw.js'],
         // Airline logos keep working offline once seen (opaque responses ok).
         runtimeCaching: [
+          // The day maps: the style can change (new map data each week), the
+          // tiles, fonts and icons it points at do not — so places looked at
+          // once still show offline.
+          {
+            urlPattern: /^https:\/\/tiles\.openfreemap\.org\/styles\//,
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'map-styles', cacheableResponse: { statuses: [0, 200] } },
+          },
+          {
+            urlPattern: /^https:\/\/tiles\.maps\.eox\.at\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-satellite',
+              expiration: { maxEntries: 1500, maxAgeSeconds: 60 * 60 * 24 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/tiles\.openfreemap\.org\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-tiles',
+              expiration: { maxEntries: 4000, maxAgeSeconds: 60 * 60 * 24 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^https:\/\/images\.kiwi\.com\//,
             handler: 'CacheFirst',

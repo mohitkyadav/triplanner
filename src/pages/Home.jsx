@@ -20,8 +20,8 @@ import {
 import { fmtRange, todayISO } from '../lib/dates'
 import { downloadJSON, exportPayload, parseImport } from '../lib/io'
 import { makeTrip, useStore } from '../lib/store'
+import { useOnlineEnabled } from '../lib/online'
 import { countdown, groupTrips, tripPhase } from '../lib/trips'
-import { useWeatherEnabled } from '../lib/weather'
 import { vtName } from '../lib/motion'
 
 const GROUP_TITLE = { ongoing: 'Under way', upcoming: 'Upcoming', undated: 'No dates yet', past: 'Past trips' }
@@ -110,20 +110,21 @@ function TripRow({ trip, navigate, onDelete, introAt }) {
   )
 }
 
-function WeatherSetting() {
-  const [on, setOn] = useWeatherEnabled()
+// One switch for the weather, the day maps and place search.
+function OnlineSetting() {
+  const [on, setOn] = useOnlineEnabled()
   return (
     <div className="mx-auto w-full max-w-72 space-y-1.5">
       <Segmented
         value={on ? 'on' : 'off'}
         onChange={v => setOn(v === 'on')}
         options={[
-          { value: 'on', label: 'Forecasts on' },
+          { value: 'on', label: 'Weather & maps on' },
           { value: 'off', label: 'Off' },
         ]}
       />
       <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
-        Forecasts send only the destination name to Open-Meteo.
+        They send only place names and the map area you look at to Open-Meteo, OpenFreeMap and Photon.
       </p>
     </div>
   )
@@ -264,7 +265,7 @@ export default function Home({ navigate }) {
 
         <div className="mt-10 space-y-4">
           <ThemeSwitcher />
-          <WeatherSetting />
+          <OnlineSetting />
         </div>
       </main>
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import AirlineLogo from '../components/AirlineLogo'
 import { DocumentChips } from '../components/Documents'
+import DayMapPanel, { mappable } from '../components/DayMapPanel'
 import ItemForm from '../components/ItemForm'
 import MapLinks from '../components/MapLinks'
 import WeatherChip from '../components/WeatherChip'
@@ -15,6 +16,7 @@ import {
   IconChevronRight,
   IconCircle,
   IconHourglass,
+  IconMap,
   IconNavigation,
   IconPencil,
   IconPlus,
@@ -312,6 +314,7 @@ export default function Today({ id, navigate }) {
 
   const [pickedIndex, setPickedIndex] = useState(null) // null follows the clock
   const [itemModal, setItemModal] = useState(null) // { dayId, item? }
+  const [showMap, setShowMap] = useState(readMapPref)
   const swipe = useRef(null)
 
   // The day the trip is on: today, else the next day of the trip, else the last.
@@ -436,7 +439,17 @@ export default function Today({ id, navigate }) {
 
   return (
     <div className="min-h-dvh">
-      <Header trip={trip} navigate={navigate} routeUrl={routeUrl} zoneClock={zoneClock} />
+      <Header
+        trip={trip}
+        navigate={navigate}
+        routeUrl={routeUrl}
+        zoneClock={zoneClock}
+        map={mappable(day).length > 0 ? showMap : null}
+        onToggleMap={() => {
+          setShowMap(!showMap)
+          writeMapPref(!showMap)
+        }}
+      />
 
       <div
         className="sticky top-14 z-30 border-b border-slate-200/60 bg-slate-50/80 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/80"
@@ -487,6 +500,20 @@ export default function Today({ id, navigate }) {
         {...swipeHandlers}
       >
         {day.title && <p className="px-1 text-sm font-medium text-slate-500 dark:text-slate-400">{day.title}</p>}
+
+        {showMap && mappable(day).length > 0 && (
+          // panning the map is not a swipe to another day
+          <div onTouchStart={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
+            <DayMapPanel
+              trip={trip}
+              day={day}
+              runningId={plan.running ? plan.hero.item.id : null}
+              onStatus={setStatus}
+              onEdit={item => setItemModal({ dayId: day.id, item })}
+              className="h-60"
+            />
+          </div>
+        )}
 
         {plan.total === 0 && (
           <div className="rounded-2xl border-2 border-dashed border-slate-300 px-4 py-10 text-center dark:border-slate-700">
@@ -602,7 +629,25 @@ export default function Today({ id, navigate }) {
   )
 }
 
-function Header({ trip, navigate, routeUrl, zoneClock }) {
+// Trip mode remembers whether the map was shown.
+const MAP_PREF = 'triplanner:today-map'
+function readMapPref() {
+  try {
+    return localStorage.getItem(MAP_PREF) !== 'off'
+  } catch {
+    return true
+  }
+}
+function writeMapPref(on) {
+  try {
+    localStorage.setItem(MAP_PREF, on ? 'on' : 'off')
+  } catch {
+    // storage unavailable — the choice lasts for this visit
+  }
+}
+
+// map: whether the day map shows, or null when the day has nothing to map
+function Header({ trip, navigate, routeUrl, zoneClock, map = null, onToggleMap }) {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-slate-50/80 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/80">
       <div className="mx-auto flex h-14 max-w-2xl items-center gap-1 px-4">
@@ -621,6 +666,17 @@ function Header({ trip, navigate, routeUrl, zoneClock }) {
           </p>
           <h1 className="truncate text-sm font-semibold leading-tight">{trip.name}</h1>
         </div>
+        {map != null && (
+          <button
+            className={`${iconBtn} ${map ? 'text-brand-600 dark:text-brand-300' : ''}`}
+            onClick={onToggleMap}
+            aria-label={map ? 'Hide the map' : 'Show the map'}
+            aria-pressed={map}
+            title={map ? 'Hide the map' : 'Show the map'}
+          >
+            <IconMap className="size-4.5" />
+          </button>
+        )}
         {routeUrl && (
           <a
             className={iconBtn}

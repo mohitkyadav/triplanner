@@ -1,13 +1,15 @@
 import { useDroppable } from '@dnd-kit/core'
+import { useState } from 'react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { fmtDate } from '../lib/dates'
 import { dayRouteUrl } from '../lib/maps'
 import { dayCost, fmtMoney } from '../lib/money'
 import { useStore } from '../lib/store'
-import WeatherChip from './WeatherChip'
-import ItemCard from './ItemCard'
-import { IconBed, IconPencil, IconPlus, IconRoute, IconTrash, iconBtn, useToast } from './ui'
 import { vtName } from '../lib/motion'
+import DayMapPanel, { mappable } from './DayMapPanel'
+import ItemCard from './ItemCard'
+import { IconBed, IconMap, IconPencil, IconPlus, IconRoute, IconTrash, iconBtn, Menu, Modal, useToast } from './ui'
+import WeatherChip from './WeatherChip'
 
 export default function DayCard({
   trip,
@@ -40,6 +42,7 @@ export default function DayCard({
     })
   }
 
+  const [mapOpen, setMapOpen] = useState(false)
   const cost = dayCost(trip, day)
   const routeUrl = dayRouteUrl(trip, day)
 
@@ -71,24 +74,33 @@ export default function DayCard({
             {fmtMoney(cost, trip.currency)}
           </span>
         )}
-        {routeUrl && (
-          <a
+        {mappable(day).length > 0 && (
+          <button
             className={iconBtn}
-            href={routeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Open the day route in Google Maps"
-            title="Day route in Google Maps"
+            onClick={() => setMapOpen(true)}
+            aria-label="Map of the day"
+            title="Map of the day"
           >
-            <IconRoute className="size-4" />
-          </a>
+            <IconMap className="size-4" />
+          </button>
         )}
-        <button className={iconBtn} onClick={onEditDay} aria-label="Edit day">
-          <IconPencil className="size-4" />
-        </button>
-        <button className={iconBtn} onClick={deleteDay} aria-label="Delete day">
-          <IconTrash className="size-4" />
-        </button>
+        {/* the rest in a menu, so the header fits a narrow phone */}
+        <Menu
+          label="More day actions"
+          items={[
+            { label: 'Edit day', icon: IconPencil, onClick: onEditDay },
+            ...(routeUrl
+              ? [
+                  {
+                    label: 'Day route in Google Maps',
+                    icon: IconRoute,
+                    onClick: () => window.open(routeUrl, '_blank', 'noopener,noreferrer'),
+                  },
+                ]
+              : []),
+            { label: 'Delete day', icon: IconTrash, onClick: deleteDay, danger: true },
+          ]}
+        />
       </div>
 
       {stays.map(name => (
@@ -133,6 +145,18 @@ export default function DayCard({
           {day.items.length === 0 ? 'Plan this day — flight, hotel, places…' : 'Add more'}
         </button>
       </div>
+      {mapOpen && (
+        <Modal title={`Day ${index + 1} on the map`} onClose={() => setMapOpen(false)}>
+          <DayMapPanel
+            trip={trip}
+            day={day}
+            className="h-[52dvh]"
+            routeUrl={routeUrl}
+            onStatus={(item, status) => setItemStatus(item.id, status)}
+            onEdit={item => onEditItem(item)}
+          />
+        </Modal>
+      )}
     </section>
   )
 }

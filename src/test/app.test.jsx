@@ -169,4 +169,35 @@ describe('Triplanner', () => {
     // Asked once the typing settled, not on every key.
     expect(fetch.mock.calls.filter(([url]) => url.includes('adsbdb'))).toHaveLength(1)
   })
+
+  it('puts a plan on the day map from a picked place', async () => {
+    const user = userEvent.setup()
+    const feature = (name, lng, lat, extra = {}) => ({
+      geometry: { coordinates: [lng, lat] },
+      properties: { name, city: 'Lisbon', country: 'Portugal', ...extra },
+    })
+    fetch.mockImplementation(url => {
+      if (!url.startsWith('https://photon.komoot.io/')) return Promise.reject(new Error('offline in tests'))
+      const q = new URL(url).searchParams
+      const features =
+        q.get('osm_tag') === 'place'
+          ? [feature('Lisbon', -9.14, 38.72)]
+          : [feature('Cervejaria Ramiro', -9.1357, 38.7243, { street: 'Avenida Almirante Reis', housenumber: '1' })]
+      return Promise.resolve(new Response(JSON.stringify({ features })))
+    })
+    openApp([lisbon()], '/trip/trip-1')
+
+    await user.click(screen.getByRole('button', { name: 'Edit Dinner at Ramiro' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit plan' })
+    await user.type(within(dialog).getByLabelText('Map (optional)'), 'Cervejaria Ramiro')
+    await user.click(await within(dialog).findByRole('button', { name: /Cervejaria Ramiro.*Almirante Reis/ }))
+    expect(within(dialog).getByText(/Cervejaria Ramiro, Avenida Almirante Reis 1, Lisbon/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(stored().trips[0].days[0].items[0].geo).toBeDefined())
+    expect(stored().trips[0].days[0].items[0].geo).toMatchObject({ lat: 38.7243, lng: -9.1357 })
+    // the search was near the trip's destination
+    const search = fetch.mock.calls.map(([u]) => new URL(u)).find(u => u.searchParams.get('q') === 'Cervejaria Ramiro')
+    expect(search.searchParams.get('lat')).toBe('38.72')
+  })
 })

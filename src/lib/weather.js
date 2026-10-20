@@ -1,49 +1,18 @@
 import { useEffect, useState } from 'react'
 import { addDaysISO, todayISO } from './dates'
+import { useOnlineEnabled } from './online'
 
 /* The forecast for the days of a trip, from Open-Meteo — no API key, and the
    only thing sent is the destination name and its coordinates. Forecasts
    reach 16 days ahead, so only days in that window get one. The last answer
    is kept, so the forecast still shows offline.
 
-   Weather can be turned off on the home screen; then nothing is fetched. */
+   It goes off with the other online features (lib/online.js); then nothing
+   is fetched. */
 
 const CACHE_KEY = 'triplanner:weather'
-const PREF_KEY = 'triplanner:weather-off'
 const FRESH_FOR = 3 * 60 * 60 * 1000
 const WINDOW_DAYS = 15
-
-/* ---------- the on/off setting ---------- */
-
-const listeners = new Set()
-
-export const weatherEnabled = () => {
-  try {
-    return localStorage.getItem(PREF_KEY) !== '1'
-  } catch {
-    return true
-  }
-}
-
-export function setWeatherEnabled(on) {
-  try {
-    if (on) localStorage.removeItem(PREF_KEY)
-    else localStorage.setItem(PREF_KEY, '1')
-  } catch {
-    // storage unavailable — the setting lasts for this visit only
-  }
-  listeners.forEach(fn => fn())
-}
-
-export function useWeatherEnabled() {
-  const [on, setOn] = useState(weatherEnabled)
-  useEffect(() => {
-    const sync = () => setOn(weatherEnabled())
-    listeners.add(sync)
-    return () => listeners.delete(sync)
-  }, [])
-  return [on, setWeatherEnabled]
-}
 
 /* ---------- WMO weather codes ---------- */
 
@@ -129,7 +98,7 @@ const inWindow = (trip, today) => {
    cached forecast at once and refreshes it when it is old and the device is
    online. */
 export function useWeather(trip) {
-  const [on] = useWeatherEnabled()
+  const [on] = useOnlineEnabled()
   const dest = (trip?.destination ?? '').trim()
   const key = dest.toLowerCase()
   const relevant = Boolean(on && dest && trip && inWindow(trip, todayISO(trip.timeZone)))

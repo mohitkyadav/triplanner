@@ -3,9 +3,11 @@ import { airlineFromFlightNo, callsign } from '../lib/airlines'
 import { CATEGORIES } from '../lib/categories'
 import { fmtDate } from '../lib/dates'
 import { useFlightRoute } from '../lib/flightRoute'
+import { coordsFromLink, placeText } from '../lib/geo'
 import { placeLinks } from '../lib/maps'
 import AirlineLogo from './AirlineLogo'
 import { DocumentList } from './Documents'
+import PlacePicker from './PlacePicker'
 import {
   btnChip,
   btnDanger,
@@ -43,6 +45,7 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
   const [status, setStatus] = useState(initial?.status ?? 'planned')
   const [targetDay, setTargetDay] = useState(dayId)
   const [docs, setDocs] = useState(initial?.attachments ?? [])
+  const [spot, setSpot] = useState(initial?.geo ?? null) // where it shows on the day map
   const [f, setF] = useState({
     title: initial?.title ?? '',
     time: initial?.time ?? '',
@@ -84,6 +87,7 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
       notes: f.notes.trim(),
       status: status === 'planned' ? undefined : status,
       attachments: docs.length ? docs : undefined,
+      geo: type === 'flight' ? undefined : (coordsFromLink(f.place) ?? spot ?? undefined),
       // fields an older version wrote, dropped on the next save
       mapsUrl: undefined,
       direction: undefined,
@@ -312,6 +316,19 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
               ? `Opens a search for “${mapHint.query}”.`
               : 'Add a name above and the map buttons search for it.'}
         </p>
+        {type !== 'flight' && (
+          <PlacePicker
+            trip={trip}
+            text={placeText(f)}
+            spot={spot}
+            linked={Boolean(coordsFromLink(f.place))}
+            onPick={(picked, place) => {
+              setSpot(picked)
+              // a plan picked from the suggestions before it had a name takes the place's
+              if (place && !f.title.trim()) setF(prev => ({ ...prev, title: place.name }))
+            }}
+          />
+        )}
 
         <Field label="Notes (optional)">
           <textarea

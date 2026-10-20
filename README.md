@@ -26,7 +26,17 @@ device; signing in (optional) syncs your trips between devices.
   costs in other currencies (with your own exchange rates, so it works
   offline), and a split between travellers with who-owes-whom.
 - **Weather** — a forecast on each day within 16 days, from Open-Meteo (no
-  key; only the destination name is sent; can be turned off).
+  key; only the destination name is sent).
+- **Day maps** — each day's plans as numbered pins on a real map, joined in
+  order; done ones turn into a check, skipped ones fade, the one under way
+  pulses. In Trip mode above the day, on the trip page from each day's map
+  button. Pick a plan's place from suggestions as you type (Photon), or
+  paste a Maps link; plans from before get a best guess. Maps from
+  OpenFreeMap — no keys anywhere; places looked at once show offline.
+  Seven looks (Streets, Light, Bright, Dark, Night blue, Satellite from
+  EOX's Sentinel-2 cloudless imagery, or Auto with the app's theme), full
+  screen with a floating card for the picked place, and your own position.
+  Weather and maps share one on/off switch on the home screen.
 - **Maps with no link to paste** — `place` takes any text: a Maps link opens
   that exact place, anything else gives a Google and an Apple search button.
   Empty falls back to the plan name plus the destination.
@@ -87,6 +97,7 @@ Deploy: `netlify.toml` is ready — point Netlify at the repo, or run
 | Budget | `lib/money.js` — conversion with `trip.rates`, the split and the settle-up |
 | Weather | `lib/weather.js` — Open-Meteo geocoding + forecast, cached for offline |
 | Flight route | `lib/flightRoute.js` — a flight number's usual airports from adsbdb.com, cached for offline |
+| Maps | `lib/geo.js` — place search and best guesses (Photon), coordinates from Maps links; `components/DayMap.jsx` — MapLibre + OpenFreeMap, loaded on first use; `lib/mapStyles.js` — the looks; `lib/online.js` — the weather & maps switch |
 | Inbox | `lib/inbox.js` + `public/share-target-sw.js` — files shared to the app (share target) or opened with it (file handlers) |
 | Sync | `lib/sync.jsx` — per-trip merge with the account (`triplanner_trips`): the side that changed wins, the newer edit if both did; deletes travel as tombstones. Uploads 2 s after an edit, on focus, on reconnect and every 5 min. |
 | Durability | `lib/backup.js` — IndexedDB copy after every change, plus an optional backup file (File System Access). Restores itself if `localStorage` is ever empty; follows deletions, so a delete stays deleted. |

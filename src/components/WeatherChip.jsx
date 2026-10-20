@@ -12,7 +12,8 @@ export default function WeatherChip({ day, className = '' }) {
     >
       <span aria-hidden="true">{icon.emoji}</span>
       <span>
-        {day.max}°<span className="font-medium text-slate-400 dark:text-slate-500"> / {day.min}°</span>
+        {day.max}°{/* the low only where there is room */}
+        <span className="hidden font-medium text-slate-400 min-[400px]:inline dark:text-slate-500"> / {day.min}°</span>
       </span>
       <span className="sr-only">{icon.label}</span>
     </span>
