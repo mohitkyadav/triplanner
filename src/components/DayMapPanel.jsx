@@ -238,7 +238,7 @@ function MapButtons({ styleId, onStyle, full, onFull }) {
                     onStyle(s.id)
                     setOpen(false)
                   }}
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="focus-inset flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800"
                   aria-pressed={styleId === s.id}
                 >
                   <span className="grid size-4 shrink-0 place-items-center text-brand-600 dark:text-brand-300">

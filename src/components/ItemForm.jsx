@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { airlineFromFlightNo, callsign } from '../lib/airlines'
 import { CATEGORIES } from '../lib/categories'
 import { fmtDate } from '../lib/dates'
 import { useFlightRoute } from '../lib/flightRoute'
-import { coordsFromLink, placeText } from '../lib/geo'
+import { coordsFromLink } from '../lib/geo'
 import { placeLinks } from '../lib/maps'
 import AirlineLogo from './AirlineLogo'
 import { DocumentList } from './Documents'
-import PlacePicker from './PlacePicker'
+import { PlaceSpot, PlaceSuggestions } from './PlacePicker'
 import {
   btnChip,
   btnDanger,
@@ -46,6 +46,10 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
   const [targetDay, setTargetDay] = useState(dayId)
   const [docs, setDocs] = useState(initial?.attachments ?? [])
   const [spot, setSpot] = useState(initial?.geo ?? null) // where it shows on the day map
+  // The field place suggestions follow: the name or the map text, whichever
+  // was typed in last; none once another field is in use.
+  const [searchIn, setSearchIn] = useState(null)
+  const nameRef = useRef(null)
   const [f, setF] = useState({
     title: initial?.title ?? '',
     time: initial?.time ?? '',
@@ -106,6 +110,19 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
   const titlePlaceholder =
     type === 'flight' ? 'e.g. Off to Lisbon' : type === 'hotel' ? 'e.g. Hotel Alfama' : 'e.g. Louvre Museum'
   const airline = type === 'flight' ? airlineFromFlightNo(f.flightNo) : null
+  const mappable = type !== 'flight'
+  const linked = Boolean(coordsFromLink(f.place))
+  const searching = mappable && !spot && !linked
+  function pick(picked, place) {
+    setSpot(picked)
+    // a plan picked from the suggestions before it had a name takes the place's
+    if (!f.title.trim()) setF(prev => ({ ...prev, title: place.name }))
+  }
+  // Drops the spot and goes back to the name, where suggestions show again.
+  function pickAgain() {
+    setSpot(null)
+    nameRef.current?.focus()
+  }
   const route = useFlightRoute(type === 'flight' ? f.flightNo : '')
   const code = callsign(f.flightNo)
   const shows = r => r && f.from === r.from && f.to === r.to
@@ -178,7 +195,15 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
 
   return (
     <Modal title={editing ? 'Edit plan' : `Add to ${dayLabel}`} onClose={onClose}>
-      <form onSubmit={submit} className="space-y-4">
+      <form
+        onSubmit={submit}
+        className="space-y-4"
+        onFocusCapture={e => {
+          const field = e.target.dataset?.search
+          if (field) setSearchIn(field)
+          else if (e.target.matches('input, select, textarea')) setSearchIn(null)
+        }}
+      >
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Kind of plan">
           {CATEGORIES.map(c => (
             <button
@@ -263,6 +288,8 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
 
         <Field label={titleLabel}>
           <input
+            ref={nameRef}
+            data-search="title"
             className={inputCls}
             value={f.title}
             onChange={set('title')}
@@ -271,6 +298,8 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
             autoFocus={editing ? undefined : type !== 'flight'}
           />
         </Field>
+        {mappable && <PlaceSpot spot={spot} linked={linked} onClear={pickAgain} />}
+        {searching && searchIn === 'title' && <PlaceSuggestions trip={trip} text={f.title} onPick={pick} />}
 
         {type === 'hotel' && (
           <Field label="Time (optional)">
@@ -304,34 +333,23 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
 
         <Field label="Map (optional)">
           <input
+            data-search="place"
             className={inputCls}
             value={f.place}
             onChange={set('place')}
             placeholder="Address, place name, or a Maps link"
           />
         </Field>
+        {searching && searchIn === 'place' && <PlaceSuggestions trip={trip} text={f.place} onPick={pick} />}
         <p className="-mt-2.5 text-[13px] text-slate-400 dark:text-slate-500">
           {mapHint.kind === 'link'
             ? 'A Maps link opens that exact place.'
             : mapHint.exact
-              ? 'The map buttons and directions go to the exact spot picked below.'
+              ? 'The map buttons and directions go to the exact spot you picked.'
               : mapHint.query
                 ? `Opens a search for “${mapHint.query}”.`
                 : 'Add a name above and the map buttons search for it.'}
         </p>
-        {type !== 'flight' && (
-          <PlacePicker
-            trip={trip}
-            text={placeText(f)}
-            spot={spot}
-            linked={Boolean(coordsFromLink(f.place))}
-            onPick={(picked, place) => {
-              setSpot(picked)
-              // a plan picked from the suggestions before it had a name takes the place's
-              if (place && !f.title.trim()) setF(prev => ({ ...prev, title: place.name }))
-            }}
-          />
-        )}
 
         <Field label="Notes (optional)">
           <textarea

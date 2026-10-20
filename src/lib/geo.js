@@ -148,18 +148,24 @@ export function useDestinationCenter(destination) {
   return found.name === name ? found.center : null
 }
 
-/* Suggestions for what is being typed, once the typing pauses. */
-export function usePlaceSearch(text, center, enabled = true) {
+/* Suggestions for what is being typed, once the typing pauses:
+   { places, searching }. Photon can take a few seconds, so the last
+   suggestions stay up while a newer search runs. */
+export function usePlaceSearch(text, center) {
   const [on] = useOnlineEnabled()
   const q = String(text ?? '').trim()
-  const active = on && enabled && q.length >= 3 && !/^https?:\/\//i.test(q)
+  const active = on && q.length >= 3 && !/^https?:\/\//i.test(q)
   const [found, setFound] = useState({ q: '', places: [] })
+  // by value: the destination's middle arriving again is not a new search
+  const lat = center?.lat
+  const lng = center?.lng
 
   useEffect(() => {
     if (!active) return
     const ctrl = new AbortController()
+    const near = lat != null ? { lat, lng } : null
     const timer = setTimeout(() => {
-      searchPlaces(q, center, ctrl.signal)
+      searchPlaces(q, near, ctrl.signal)
         .then(places => setFound({ q, places }))
         .catch(() => {})
     }, TYPE_WAIT_MS)
@@ -167,9 +173,10 @@ export function usePlaceSearch(text, center, enabled = true) {
       clearTimeout(timer)
       ctrl.abort()
     }
-  }, [active, q, center])
+  }, [active, q, lat, lng])
 
-  return active && found.q === q ? found.places : []
+  if (!active) return { places: [], searching: false }
+  return { places: found.places, searching: found.q !== q }
 }
 
 /* ---------- best guesses for plans saved before the map ---------- */

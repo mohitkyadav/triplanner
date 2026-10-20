@@ -142,7 +142,7 @@ export default function DataSafety({ onExport, onImport }) {
     <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center gap-3 px-5 py-3.5 text-left"
+        className="focus-inset flex w-full items-center gap-3 rounded-2xl px-5 py-3.5 text-left"
         aria-expanded={open}
       >
         <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${TONE[level].chip}`}>

@@ -227,12 +227,12 @@ function PlanRow({ trip, entry, clash, muted, onEdit, onStatus }) {
 
   return (
     <li
-      className="flex items-center gap-2.5 rounded-xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+      className="card-focus flex items-center gap-2.5 rounded-xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
       style={planName(item)}
     >
       <button
         onClick={onEdit}
-        className={`flex min-w-0 flex-1 items-center gap-2.5 text-left ${muted ? 'opacity-55' : ''}`}
+        className={`card-hit flex min-w-0 flex-1 items-center gap-2.5 text-left ${muted ? 'opacity-55' : ''}`}
       >
         <span className="w-11 shrink-0 text-center text-xs font-bold tabular-nums text-slate-500 dark:text-slate-400">
           {entry.start == null ? '—' : fmtClock(entry.start)}

@@ -48,7 +48,7 @@ function TripRow({ trip, navigate, onDelete, introAt }) {
         animationDelay: introAt != null ? `${Math.min(introAt, 8) * 60}ms` : undefined,
       }}
       data-vt-shared
-      className={`${introAt != null ? 'anim-rise ' : ''}group cursor-pointer rounded-2xl bg-white p-4 shadow-sm outline-none ring-1 transition hover:shadow-md hover:ring-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-slate-900 dark:hover:ring-brand-600 ${
+      className={`${introAt != null ? 'anim-rise ' : ''}group cursor-pointer rounded-2xl bg-white p-4 shadow-sm ring-1 transition hover:shadow-md hover:ring-brand-300 dark:bg-slate-900 dark:hover:ring-brand-600 ${
         phase.phase === 'ongoing' ? 'ring-brand-300 dark:ring-brand-600' : 'ring-slate-200 dark:ring-slate-800'
       } ${phase.phase === 'past' ? 'opacity-75' : ''}`}
     >
@@ -115,11 +115,12 @@ function OnlineSetting() {
   const [on, setOn] = useOnlineEnabled()
   return (
     <div className="mx-auto w-full max-w-72 space-y-1.5">
+      <p className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400">Weather &amp; maps</p>
       <Segmented
         value={on ? 'on' : 'off'}
         onChange={v => setOn(v === 'on')}
         options={[
-          { value: 'on', label: 'Weather & maps on' },
+          { value: 'on', label: 'On' },
           { value: 'off', label: 'Off' },
         ]}
       />

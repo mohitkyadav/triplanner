@@ -32,7 +32,9 @@ export default function MapLinks({ trip, item, hero = false }) {
   }
 
   // The chip keeps the row's height; the padding around it makes the tap
-  // target big enough for a thumb.
+  // target big enough for a thumb. The focus ring goes on the chip you see.
+  const ring =
+    'group-focus-visible/map:outline-2 group-focus-visible/map:outline-offset-2 group-focus-visible/map:outline-brand-500 dark:group-focus-visible/map:outline-brand-300'
   const chip = hero
     ? 'grid size-9 place-items-center rounded-lg bg-slate-100 text-slate-600 transition group-hover/map:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
     : 'grid size-7 place-items-center rounded-md text-slate-400 ring-1 ring-slate-200 transition group-hover/map:bg-slate-100 group-hover/map:text-brand-600 dark:text-slate-500 dark:ring-slate-700'
@@ -47,11 +49,11 @@ export default function MapLinks({ trip, item, hero = false }) {
             target="_blank"
             rel="noopener noreferrer"
             onClick={stop}
-            className="group/map -my-1.5 shrink-0 py-1.5"
+            className="group/map -my-1.5 shrink-0 py-1.5 focus-visible:outline-none"
             aria-label={`Search ${links.query} in ${meta.label}`}
             title={`${links.query} — ${meta.label}`}
           >
-            <span className={chip}>
+            <span className={`${chip} ${ring}`}>
               <meta.icon className={hero ? 'size-4' : 'size-3.5'} />
             </span>
           </a>

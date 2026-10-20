@@ -51,7 +51,7 @@ export default function BudgetCard({ trip }) {
     >
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center gap-3 px-5 py-3.5 text-left"
+        className="focus-inset flex w-full items-center gap-3 rounded-2xl px-5 py-3.5 text-left"
         aria-expanded={open}
       >
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 text-lg">💶</span>

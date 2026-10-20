@@ -408,7 +408,7 @@ export default function TripView({ id, navigate }) {
               onClick={() => navigate(`/trip/${trip.id}/today`)}
               style={{ viewTransitionName: vtName('tripmode', trip.id) }}
               data-vt-shared
-              className="flex w-full items-center gap-3 border-t border-slate-100 px-5 py-3 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
+              className="focus-inset flex w-full items-center gap-3 rounded-b-2xl border-t border-slate-100 px-5 py-3 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
             >
               <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 text-amber-700 dark:text-amber-400">
                 <IconNavigation className="size-4.5" />

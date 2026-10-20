@@ -30,6 +30,54 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* ---------- focus ----------
+   One ring for everything that can be tabbed to, drawn as an outline so it
+   follows the element's own rounded shape. In the base layer, so a utility
+   (outline-none on a dialog, the ring on text fields) still wins.
+   - focus-inset: a row that fills a rounded card or list draws the ring
+     inside itself, where the card would otherwise clip its corners.
+   - card-focus / card-hit: a card whose tappable area is a part of it rings
+     the whole card. */
+@layer base {
+  :where(
+    a,
+    button,
+    summary,
+    [role='button'],
+    [role='link'],
+    [role='radio'],
+    [tabindex]:not([tabindex='-1'])
+  ):focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+  [data-theme='dark']
+    :where(
+      a,
+      button,
+      summary,
+      [role='button'],
+      [role='link'],
+      [role='radio'],
+      [tabindex]:not([tabindex='-1'])
+    ):focus-visible {
+    outline-color: var(--color-brand-300);
+  }
+  .focus-inset:focus-visible {
+    outline-offset: -2px;
+  }
+  .card-hit:focus-visible {
+    outline: none;
+  }
+  .card-focus:has(.card-hit:focus-visible) {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+  [data-theme='dark'] .card-focus:has(.card-hit:focus-visible) {
+    outline-color: var(--color-brand-300);
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

@@ -461,7 +461,7 @@ export function Segmented({ options, value, onChange }) {
           type="button"
           key={o.value}
           onClick={e => onChange(o.value, e)}
-          className={`relative inline-flex flex-1 basis-0 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`focus-inset relative inline-flex flex-1 basis-0 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
             value === o.value
               ? 'text-slate-900 dark:text-white'
               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -752,7 +752,7 @@ export function Menu({ items, label = 'More options' }) {
                   setOpen(false)
                   item.onClick()
                 }}
-                className={`flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm font-medium transition ${
+                className={`focus-inset flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm font-medium transition ${
                   item.danger
                     ? 'text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10'
                     : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'

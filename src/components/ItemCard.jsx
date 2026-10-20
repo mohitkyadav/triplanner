@@ -84,7 +84,7 @@ function Card({
       style={
         overlay ? dragStyle : { ...dragStyle, viewTransitionName: vtName('plan', item.id), viewTransitionClass: 'plan' }
       }
-      className={`relative flex items-start gap-2 rounded-xl bg-white p-3 ring-1 dark:bg-slate-900 ${
+      className={`card-focus relative flex items-start gap-2 rounded-xl bg-white p-3 ring-1 dark:bg-slate-900 ${
         ghost
           ? 'opacity-40 shadow-sm ring-slate-200 dark:ring-slate-800'
           : overlay
@@ -102,7 +102,7 @@ function Card({
       </button>
 
       <div
-        className={`flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg outline-none transition-opacity duration-300 focus-visible:ring-2 focus-visible:ring-brand-500 ${skipped ? 'opacity-50' : ''}`}
+        className={`card-hit flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg transition-opacity duration-300 ${skipped ? 'opacity-50' : ''}`}
         onClick={onEdit}
         onKeyDown={onKeyDown}
         role="button"
