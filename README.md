@@ -36,6 +36,8 @@ device; signing in (optional) syncs your trips between devices.
   Seven looks (Streets, Light, Bright, Dark, Night blue, Satellite from
   EOX's Sentinel-2 cloudless imagery, or Auto with the app's theme), full
   screen with a floating card for the picked place, and your own position.
+  A picked place also sends the Google/Apple buttons, the directions
+  between stops and the day route to that exact spot.
   Weather and maps share one on/off switch on the home screen.
 - **Maps with no link to paste** — `place` takes any text: a Maps link opens
   that exact place, anything else gives a Google and an Apple search button.

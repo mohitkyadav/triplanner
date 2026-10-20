@@ -119,7 +119,8 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
     setFilled(free ? route : null)
   }
   // What the map buttons will do, shown live under the field.
-  const mapHint = placeLinks(trip, { type, title: f.title, from: f.from, to: f.to, place: f.place }) ?? {}
+  const mapHint =
+    placeLinks(trip, { type, title: f.title, from: f.from, to: f.to, place: f.place, geo: spot ?? undefined }) ?? {}
   const otherDays = days && days.length > 1
 
   const costFields = (
@@ -312,9 +313,11 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
         <p className="-mt-2.5 text-[13px] text-slate-400 dark:text-slate-500">
           {mapHint.kind === 'link'
             ? 'A Maps link opens that exact place.'
-            : mapHint.query
-              ? `Opens a search for “${mapHint.query}”.`
-              : 'Add a name above and the map buttons search for it.'}
+            : mapHint.exact
+              ? 'The map buttons and directions go to the exact spot picked below.'
+              : mapHint.query
+                ? `Opens a search for “${mapHint.query}”.`
+                : 'Add a name above and the map buttons search for it.'}
         </p>
         {type !== 'flight' && (
           <PlacePicker
