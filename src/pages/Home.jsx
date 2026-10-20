@@ -10,6 +10,7 @@ import {
   IconQrCode,
   IconTrash,
   IconUpload,
+  IconUsers,
   Segmented,
   btnChipBrand,
   btnGhost,
@@ -19,6 +20,7 @@ import {
 } from '../components/ui'
 import { fmtRange, todayISO } from '../lib/dates'
 import { downloadJSON, exportPayload, parseImport } from '../lib/io'
+import { leaveTrip } from '../lib/shares'
 import { makeTrip, useStore } from '../lib/store'
 import { useOnlineEnabled } from '../lib/online'
 import { countdown, groupTrips, tripPhase } from '../lib/trips'
@@ -64,6 +66,12 @@ function TripRow({ trip, navigate, onDelete, introAt }) {
           {trip.destination && (
             <p className="truncate text-sm text-slate-500 dark:text-slate-400">{trip.destination}</p>
           )}
+          {trip.sharedFrom && (
+            <p className="mt-0.5 flex items-center gap-1 truncate text-xs font-medium text-brand-700 dark:text-brand-300">
+              <IconUsers className="size-3.5 shrink-0" />
+              Shared by {trip.sharedFrom.ownerEmail || 'someone'}
+            </p>
+          )}
         </div>
         {when && (
           <span className="mt-1 shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-400">
@@ -76,7 +84,7 @@ function TripRow({ trip, navigate, onDelete, introAt }) {
             e.stopPropagation()
             onDelete(trip)
           }}
-          aria-label={`Delete ${trip.name}`}
+          aria-label={trip.sharedFrom ? `Remove ${trip.name} from my trips` : `Delete ${trip.name}`}
         >
           <IconTrash className="size-4" />
         </button>
@@ -172,7 +180,22 @@ export default function Home({ navigate }) {
     }
   }
 
+  // A trip shared with you is not yours to delete: you can stop seeing it.
+  async function leave(trip) {
+    const owner = trip.sharedFrom.ownerEmail || 'its owner'
+    if (!window.confirm(`Remove “${trip.name}” from your trips? You will stop seeing it; ${owner} keeps it.`)) return
+    try {
+      await leaveTrip(trip)
+    } catch (err) {
+      toast(err.message)
+      return
+    }
+    dispatch({ type: 'trip/delete', id: trip.id })
+    toast('Removed from your trips')
+  }
+
   function deleteTrip(trip) {
+    if (trip.sharedFrom) return leave(trip)
     if (!window.confirm(`Delete the trip “${trip.name}”?`)) return
     const index = state.trips.findIndex(t => t.id === trip.id)
     dispatch({ type: 'trip/delete', id: trip.id })

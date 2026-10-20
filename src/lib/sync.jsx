@@ -1,22 +1,32 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { migrate, useStore } from './store'
 import { supabase } from './supabase'
+import { mergeTrip } from './tripMerge'
 
 /* Sync with the chapri-apps account. The device stays the source of truth and
    works offline; when signed in, each trip is copied to the account and the
    account's trips come back to every device.
 
-   A trip is one row. Which copy wins is decided per trip, from its updatedAt
-   and the version both sides last agreed on (`known`):
+   A trip is one row, owned by whoever made it; people it is shared with
+   (lib/shares.js) read and edit that same row. Which copy wins is decided per
+   trip, from its updatedAt and the version both sides last agreed on (`known`):
    - changed on one side only → that side wins;
-   - changed on both → the newer edit wins.
+   - changed on both → both sides' changes are merged (lib/tripMerge.js) with
+     the copy last agreed on (`bases`), or, without one, the newer edit wins.
    A deleted trip leaves a tombstone, so the delete reaches the other devices
-   instead of the trip coming back from them. */
+   instead of the trip coming back from them.
+
+   A trip shared with you lives here under its own key (`<id>~<owner>`), so it
+   never clashes with one of your own, and carries `sharedFrom`. Only its owner
+   can delete it; you can leave it. */
 
 export const syncEnabled = Boolean(supabase)
 
 const META = 'triplanner:sync'
+// The copy of each trip both sides last agreed on, for merging.
+const BASES = 'triplanner:sync-bases'
 const TABLE = 'triplanner_trips'
+export const SHARES = 'triplanner_trip_shares'
 // A burst of edits (typing, a drag) uploads once.
 const SYNC_DELAY = 2000
 // While the app is open and visible, edits from other devices arrive this often.
@@ -46,64 +56,146 @@ function writeMeta(meta) {
   }
 }
 
-/* ---------- the merge ---------- */
+function readBases() {
+  try {
+    const b = JSON.parse(localStorage.getItem(BASES))
+    return b && typeof b === 'object' ? b : {}
+  } catch {
+    return {}
+  }
+}
 
-// `trips`: this device. `rows`: the account ({ id, data, updated_at, deleted }).
-// Returns what to change on each side; `pushed` is recorded as known only once
-// the upload went through.
-export function planSync(trips, rows, { known, deleted }) {
+function writeBases(bases) {
+  try {
+    localStorage.setItem(BASES, JSON.stringify(bases))
+  } catch {
+    // storage full — merging falls back to "the newer edit wins"
+  }
+}
+
+// Records what both sides now agree on; null forgets a trip.
+function updateBases(changes) {
+  const keys = Object.keys(changes)
+  if (!keys.length) return
+  const bases = readBases()
+  for (const key of keys) {
+    if (changes[key]) bases[key] = changes[key]
+    else delete bases[key]
+  }
+  writeBases(bases)
+}
+
+/* ---------- account rows ↔ trips here ---------- */
+
+// A row of the account as this device sees it: its key here, whose it is, and
+// the trip in local form (a shared one under its own key, with `sharedFrom`).
+export function toLocalRow(row, me, ownerEmails = new Map()) {
+  const own = row.user_id === me
+  const key = own ? row.id : `${row.id}~${row.user_id}`
+  let trip = row.data
+  if (!own && isTrip(trip)) {
+    trip = {
+      ...trip,
+      id: key,
+      sharedFrom: { ownerId: row.user_id, tripId: row.id, ownerEmail: ownerEmails.get(key) ?? '', viewerId: me },
+    }
+  }
+  return { key, owner: row.user_id, shared: !own, trip, updated_at: row.updated_at, deleted: row.deleted }
+}
+
+// The trip as it is stored in the account (a shared one under its owner's id).
+export function toRemoteTrip(trip) {
+  if (!trip?.sharedFrom) return trip
+  const { sharedFrom, ...rest } = trip
+  return { ...rest, id: sharedFrom.tripId }
+}
+
+/* ---------- the plan ---------- */
+
+// `trips`: this device. `rows`: the account, from toLocalRow. `bases`: the
+// copies last agreed on. Returns what to change on each side; `pushed` (and
+// its base) is recorded only once the upload went through.
+export function planSync(trips, rows, { known, deleted }, bases = {}) {
   const local = new Map(trips.map(t => [t.id, t]))
-  const remote = new Map(rows.map(r => [r.id, r]))
-  const out = { pull: [], remove: [], push: [], pushed: {}, known: { ...known }, deleted: { ...deleted } }
+  const remote = new Map(rows.map(r => [r.key, r]))
+  const out = {
+    pull: [],
+    remove: [],
+    push: [],
+    pushed: {},
+    known: { ...known },
+    deleted: { ...deleted },
+    bases: {}, // agreed now (from the account); null forgets
+  }
 
-  for (const id of new Set([...local.keys(), ...remote.keys(), ...Object.keys(deleted)])) {
-    const L = local.get(id)
-    const R = remote.get(id)
-    const base = known[id]
+  for (const key of new Set([...local.keys(), ...remote.keys(), ...Object.keys(deleted)])) {
+    const L = local.get(key)
+    const R = remote.get(key)
+    const shared = R ? R.shared : Boolean(L?.sharedFrom)
+    const agreed = known[key]
     const lt = L ? ms(L.updatedAt) : 0
     const rt = R ? ms(R.updated_at) : 0
 
-    const push = () => {
-      out.push.push({ id, data: L, updated_at: stamp(lt), deleted: false })
-      out.pushed[id] = lt
+    const push = (trip, t) => {
+      out.push.push({ key, owner: R?.owner ?? null, shared, trip, updated_at: stamp(t), deleted: false })
+      out.pushed[key] = t
     }
     const take = () => {
-      if (!isTrip(R.data)) return // nothing usable in the account — leave both alone
-      out.pull.push(R.data)
-      out.known[id] = rt
+      if (!isTrip(R.trip)) return // nothing usable in the account — leave both alone
+      out.pull.push(R.trip)
+      out.known[key] = rt
+      out.bases[key] = R.trip
+    }
+    const drop = () => {
+      out.remove.push(key)
+      if (R) out.known[key] = rt
+      out.bases[key] = null
     }
 
     if (L) {
-      delete out.deleted[id] // here after all (an Undo)
-      if (!R) push()
-      else if (R.deleted) {
-        // Edited here after it was deleted elsewhere: the edit brings it back.
-        if (lt !== base && lt > rt) push()
-        else {
-          out.remove.push(id)
-          out.known[id] = rt
-        }
-      } else if (lt === rt) out.known[id] = rt
-      else {
-        const localChanged = lt !== base
-        const remoteChanged = rt !== base
-        if (remoteChanged && (!localChanged || rt > lt)) take()
-        else push()
+      delete out.deleted[key] // here after all (an Undo)
+      if (!R) {
+        // Shared with you no longer (removed, or you left): it goes.
+        if (shared) drop()
+        else push(L, lt)
+      } else if (R.deleted) {
+        // Your trip, edited here after it was deleted elsewhere: the edit
+        // brings it back. A shared trip deleted by its owner just goes.
+        if (!shared && lt !== agreed && lt > rt) push(L, lt)
+        else drop()
+      } else if (lt === rt) {
+        out.known[key] = rt
+        if (!bases[key] && isTrip(R.trip)) out.bases[key] = R.trip
+      } else {
+        const localChanged = lt !== agreed
+        const remoteChanged = rt !== agreed
+        if (localChanged && remoteChanged) {
+          if (bases[key] && isTrip(R.trip)) {
+            // Both changed: keep both sides' changes, here and there.
+            const merged = mergeTrip(bases[key], L, R.trip)
+            out.pull.push(merged)
+            push(merged, ms(merged.updatedAt))
+          } else if (rt > lt) take()
+          else push(L, lt)
+        } else if (remoteChanged) take()
+        else push(L, lt)
       }
     } else if (R && !R.deleted) {
-      const at = deleted[id]
-      // Not on this device and not deleted here: new from another device. Edited
-      // elsewhere after this device deleted it: the edit wins.
-      if (at == null || (rt !== base && rt > at)) {
+      const at = deleted[key]
+      // Not on this device and not deleted here: new from another device (or
+      // newly shared with you). Edited elsewhere after this device deleted it:
+      // the edit wins.
+      if (shared || at == null || (rt !== agreed && rt > at)) {
         take()
-        delete out.deleted[id]
+        delete out.deleted[key]
       } else {
-        out.push.push({ id, data: null, updated_at: stamp(at), deleted: true })
-        out.pushed[id] = at
+        out.push.push({ key, owner: R.owner, shared, trip: null, updated_at: stamp(at), deleted: true })
+        out.pushed[key] = at
       }
     } else {
-      if (R) out.known[id] = rt
-      delete out.deleted[id]
+      if (R) out.known[key] = rt
+      delete out.deleted[key]
+      out.bases[key] = null
     }
   }
   return out
@@ -217,6 +309,8 @@ if (supabase) {
 }
 
 export const useSession = () => useSyncExternalStore(subscribeSession, () => session)
+// The signed-in user right now, outside React.
+export const currentUser = () => session?.user ?? null
 
 // The name shown in every chapri app; empty when the user has not set one.
 export const displayName = user => (user?.user_metadata?.display_name ?? '').trim()
@@ -278,6 +372,9 @@ export function SyncEngine() {
   const membership = useMembership()
   // Sync runs for active members only.
   const userId = membership === 'active' ? session?.user?.id : undefined
+  const email = (session?.user?.email ?? '').toLowerCase()
+  // undefined while the stored session is read, then the signed-in user or null
+  const viewer = session === undefined ? undefined : (session?.user?.id ?? null)
   const latest = useRef(state.trips)
   latest.current = state.trips
   const prevIds = useRef(null)
@@ -301,6 +398,18 @@ export function SyncEngine() {
     writeMeta(meta)
   }, [state.trips])
 
+  // Trips shared with someone stay on the device only while they are signed in
+  // as that someone: signing out, or in as another account, removes them.
+  useEffect(() => {
+    if (viewer === undefined) return
+    const foreign = latest.current.filter(t => t.sharedFrom && t.sharedFrom.viewerId !== viewer).map(t => t.id)
+    if (!foreign.length) return
+    foreign.forEach(id => removedBySync.current.add(id))
+    fromSync.current = true
+    dispatch({ type: 'sync/apply', trips: [], remove: foreign })
+    updateBases(Object.fromEntries(foreign.map(id => [id, null])))
+  }, [viewer, dispatch])
+
   // An edit here uploads after a short pause; a change that came from the
   // account does not go back up.
   useEffect(() => {
@@ -317,7 +426,10 @@ export function SyncEngine() {
       return
     }
     // Another account was used on this device before: compare from scratch.
-    if (readMeta().userId !== userId) writeMeta({ userId, known: {}, deleted: {} })
+    if (readMeta().userId !== userId) {
+      writeMeta({ userId, known: {}, deleted: {} })
+      writeBases({})
+    }
 
     let stopped = false
     let running = false
@@ -338,30 +450,65 @@ export function SyncEngine() {
       running = true
       setStatus({ state: 'syncing' })
       try {
-        const { data: rows, error } = await supabase.from(TABLE).select('id, data, updated_at, deleted')
-        if (error) throw error
+        // Own and shared trips come in one list (the server's rules decide
+        // which); the shares say who shared each one with you.
+        const [trips, shares] = await Promise.all([
+          supabase.from(TABLE).select('user_id, id, data, updated_at, deleted'),
+          supabase.from(SHARES).select('owner_id, trip_id, email, owner_email'),
+        ])
+        if (trips.error) throw trips.error
+        if (shares.error) throw shares.error
         if (stopped) return
-        const plan = planSync(latest.current, rows, readMeta())
+        const ownerEmails = new Map(
+          shares.data.filter(s => s.email === email).map(s => [`${s.trip_id}~${s.owner_id}`, s.owner_email ?? '']),
+        )
+        const rows = trips.data.map(row => toLocalRow(row, userId, ownerEmails))
+        const plan = planSync(latest.current, rows, readMeta(), readBases())
         if (plan.pull.length || plan.remove.length) {
           plan.remove.forEach(id => removedBySync.current.add(id))
           fromSync.current = true
           dispatch({ type: 'sync/apply', trips: migrate(plan.pull), remove: plan.remove })
         }
         writeMeta({ userId, known: plan.known, deleted: plan.deleted })
+        updateBases(plan.bases)
 
         if (plan.push.length) {
-          const { error: upError } = await supabase.from(TABLE).upsert(
-            plan.push.map(row => ({ ...row, user_id: userId })),
-            { onConflict: 'user_id,id' },
-          )
-          if (upError) throw upError
+          const done = []
+          // Your trips: one upsert. A trip shared with you: an update of its
+          // owner's row (you can edit it, not create or delete it).
+          const own = plan.push.filter(p => !p.shared)
+          if (own.length) {
+            const { error: upError } = await supabase.from(TABLE).upsert(
+              own.map(p => ({
+                user_id: userId,
+                id: p.key,
+                data: p.trip,
+                updated_at: p.updated_at,
+                deleted: p.deleted,
+              })),
+              { onConflict: 'user_id,id' },
+            )
+            if (upError) throw upError
+            done.push(...own)
+          }
+          for (const p of plan.push.filter(p => p.shared && !p.deleted)) {
+            const remote = toRemoteTrip(p.trip)
+            const { error: upError } = await supabase
+              .from(TABLE)
+              .update({ data: remote, updated_at: p.updated_at })
+              .eq('user_id', p.owner)
+              .eq('id', remote.id)
+            if (upError) throw upError
+            done.push(p)
+          }
           // Read again: a delete may have been recorded during the upload.
           const meta = readMeta()
-          for (const [id, at] of Object.entries(plan.pushed)) {
-            meta.known[id] = at
-            if (meta.deleted[id] === at) delete meta.deleted[id]
+          for (const p of done) {
+            meta.known[p.key] = plan.pushed[p.key]
+            if (meta.deleted[p.key] === plan.pushed[p.key]) delete meta.deleted[p.key]
           }
           writeMeta(meta)
+          updateBases(Object.fromEntries(done.map(p => [p.key, p.deleted ? null : p.trip])))
         }
         setStatus({ state: 'synced', at: new Date().toISOString(), error: null })
       } catch (err) {
@@ -401,7 +548,7 @@ export function SyncEngine() {
       window.removeEventListener('online', sync)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [userId, dispatch])
+  }, [userId, email, dispatch])
 
   return null
 }

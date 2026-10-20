@@ -160,16 +160,18 @@ export function parseImport(text) {
 }
 
 /* A copy of a trip that can live next to the original: every trip, day, plan
-   and packing id is new. Documents keep pointing at the same stored files. */
+   and packing id is new. Documents keep pointing at the same stored files.
+   A copy of a trip shared with you is your own. */
 export function cloneTrip(trip, overrides = {}) {
   const now = new Date().toISOString()
+  const { sharedFrom, ...own } = trip
   return {
-    ...trip,
+    ...own,
     id: uid(),
     createdAt: now,
     updatedAt: now,
-    days: trip.days.map(d => ({ ...d, id: uid(), items: d.items.map(i => ({ ...i, id: uid() })) })),
-    packing: (trip.packing ?? []).map(p => ({ ...p, id: uid() })),
+    days: own.days.map(d => ({ ...d, id: uid(), items: d.items.map(i => ({ ...i, id: uid() })) })),
+    packing: (own.packing ?? []).map(p => ({ ...p, id: uid() })),
     ...overrides,
   }
 }

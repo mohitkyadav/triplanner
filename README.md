@@ -48,6 +48,8 @@ device; signing in (optional) syncs your trips between devices.
 - **Share** — the trip travels inside the link, or as a QR code the built-in
   scanner reads. No server. Leave out costs or notes if you like. Receiving a
   trip you already have offers *Keep both* or *Replace mine*.
+- **Invite people** — share a trip with someone by email; they see it in their
+  Triplanner and can edit it. Both people's changes are merged.
 - **Sync** — sign in with an emailed code (or link) and the trips follow you to every
   device. One account for all the chapri apps (Supabase project
   `chapri-apps`). Offline still works; changes go up when you are back.
@@ -103,7 +105,8 @@ Deploy: `netlify.toml` is ready — point Netlify at the repo, or run
 | Flight route | `lib/flightRoute.js` — a flight number's usual airports from adsbdb.com, cached for offline |
 | Maps | `lib/geo.js` — place search and best guesses (Photon), coordinates from Maps links; `components/DayMap.jsx` — MapLibre + OpenFreeMap, loaded on first use; `lib/mapStyles.js` — the looks; `lib/online.js` — the weather & maps switch |
 | Inbox | `lib/inbox.js` + `public/share-target-sw.js` — files shared to the app (share target) or opened with it (file handlers) |
-| Sync | `lib/sync.jsx` — per-trip merge with the account (`triplanner_trips`): the side that changed wins, the newer edit if both did; deletes travel as tombstones. Uploads 2 s after an edit, on focus, on reconnect and every 5 min. |
+| Sync | `lib/sync.jsx` — per-trip sync with the account (`triplanner_trips`): the side that changed wins; if both did, `lib/tripMerge.js` merges them against the copy last agreed on (kept in `triplanner:sync-bases`), down to the plan and field. Deletes travel as tombstones. Uploads 2 s after an edit, on focus, on reconnect and every 5 min. |
+| Invites | `lib/shares.js` + `components/InviteModal.jsx` — the owner invites people by email to see and edit a trip (up to 10). The answer never says whether an email has an account. A trip shared with you is kept under its own key (`<id>~<owner>`) with `sharedFrom`; you edit the owner's row, can't delete it, and can remove it from your trips (leave). Signing out removes trips shared with you. |
 | Durability | `lib/backup.js` — IndexedDB copy after every change, plus an optional backup file (File System Access). Restores itself if `localStorage` is ever empty; follows deletions, so a delete stays deleted. |
 | Booking reader | `lib/booking.js` — the RFC 5545 subset a confirmation uses. Times are taken as written; only UTC is converted, and flagged. |
 | Map links | `lib/maps.js` — every map link, no API key |

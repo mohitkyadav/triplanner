@@ -15,6 +15,7 @@ import BookingImport from '../components/BookingImport'
 import BudgetCard from '../components/Budget'
 import DayCard from '../components/DayCard'
 import DayForm from '../components/DayForm'
+import InviteModal from '../components/InviteModal'
 import { ItemCardOverlay } from '../components/ItemCard'
 import ItemForm from '../components/ItemForm'
 import PackingList from '../components/PackingList'
@@ -37,6 +38,7 @@ import {
   IconShare,
   IconTicket,
   IconTrash,
+  IconUsers,
   Menu,
   iconBtn,
   useToast,
@@ -50,7 +52,9 @@ import { cloneTrip, downloadFile, downloadJSON, exportPayload, slug } from '../l
 import { fmtMoney, tripCost } from '../lib/money'
 import { rescheduleDays } from '../lib/reschedule'
 import { fmtTimes } from '../lib/schedule'
+import { leaveTrip } from '../lib/shares'
 import { makeDay, placeByTime, sortDays, uid, useStore } from '../lib/store'
+import { syncEnabled } from '../lib/sync'
 import { computeStays } from '../lib/stays'
 import { useWeather } from '../lib/weather'
 import { vtName } from '../lib/motion'
@@ -109,6 +113,7 @@ export default function TripView({ id, navigate }) {
   const [dayModal, setDayModal] = useState(null) // { day, index }
   const [editTrip, setEditTrip] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [inviting, setInviting] = useState(false)
   const [booking, setBooking] = useState(null) // contents of a chosen .ics file
   const [activeItem, setActiveItem] = useState(null) // item being dragged (for the overlay)
   // Plans that show up after the page did — added, imported, brought back
@@ -161,7 +166,23 @@ export default function TripView({ id, navigate }) {
     dispatch({ type: 'day/add', tripId: trip.id, day: makeDay(date) })
   }
 
+  // A trip shared with you is not yours to delete: you can stop seeing it.
+  async function leave() {
+    const owner = trip.sharedFrom.ownerEmail || 'its owner'
+    if (!window.confirm(`Remove “${trip.name}” from your trips? You will stop seeing it; ${owner} keeps it.`)) return
+    try {
+      await leaveTrip(trip)
+    } catch (err) {
+      toast(err.message)
+      return
+    }
+    dispatch({ type: 'trip/delete', id: trip.id })
+    navigate('')
+    toast('Removed from your trips')
+  }
+
   function deleteTrip() {
+    if (trip.sharedFrom) return leave()
     if (!window.confirm(`Delete the trip “${trip.name}”?`)) return
     const index = state.trips.findIndex(t => t.id === trip.id)
     dispatch({ type: 'trip/delete', id: trip.id })
@@ -341,6 +362,16 @@ export default function TripView({ id, navigate }) {
           >
             <IconNavigation className="size-4.5" />
           </button>
+          {syncEnabled && !trip.sharedFrom && (
+            <button
+              className={iconBtn}
+              onClick={() => setInviting(true)}
+              aria-label="Invite people"
+              title="Invite people"
+            >
+              <IconUsers className="size-4.5" />
+            </button>
+          )}
           <button className={iconBtn} onClick={() => setSharing(true)} aria-label="Share trip">
             <IconShare className="size-4.5" />
           </button>
@@ -354,7 +385,9 @@ export default function TripView({ id, navigate }) {
               { label: 'Export to calendar (.ics)', icon: IconCalendarPlus, onClick: exportCalendar },
               { label: 'Export as JSON', icon: IconDownload, onClick: exportTrip },
               { label: 'Duplicate trip', icon: IconCopy, onClick: duplicateTrip },
-              { label: 'Delete trip', icon: IconTrash, onClick: deleteTrip, danger: true },
+              trip.sharedFrom
+                ? { label: 'Remove from my trips', icon: IconTrash, onClick: deleteTrip, danger: true }
+                : { label: 'Delete trip', icon: IconTrash, onClick: deleteTrip, danger: true },
             ]}
           />
         </div>
@@ -374,6 +407,12 @@ export default function TripView({ id, navigate }) {
             >
               {trip.name}
             </h2>
+            {trip.sharedFrom && (
+              <p className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-brand-700 dark:text-brand-300">
+                <IconUsers className="size-4 shrink-0" />
+                Shared by {trip.sharedFrom.ownerEmail || 'someone'} · you can edit it
+              </p>
+            )}
             {trip.destination && (
               <p className="mt-1.5 flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
                 <IconMapPin className="size-4 shrink-0 text-brand-600 dark:text-brand-300" />
@@ -481,6 +520,7 @@ export default function TripView({ id, navigate }) {
         <BookingImport trip={trip} text={booking} onImport={addBooking} onClose={() => setBooking(null)} />
       )}
       {sharing && <ShareModal trip={trip} onClose={() => setSharing(false)} />}
+      {inviting && <InviteModal trip={trip} onClose={() => setInviting(false)} />}
       {dayModal && (
         <DayForm
           day={dayModal.day}
