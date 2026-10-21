@@ -148,17 +148,21 @@ function Card({
       style={
         overlay ? dragStyle : { ...dragStyle, viewTransitionName: vtName('plan', item.id), viewTransitionClass: 'plan' }
       }
-      className={`group/plan grid select-none grid-cols-[2.75rem_2rem_minmax(0,1fr)] gap-x-2.5 [-webkit-touch-callout:none] [touch-action:manipulation] ${
+      className={`group/plan grid select-none grid-cols-[2.25rem_2rem_minmax(0,1fr)] sm:grid-cols-[2.75rem_2rem_minmax(0,1fr)] gap-x-2.5 [-webkit-touch-callout:none] [touch-action:manipulation] ${
         ghost ? 'opacity-40' : ''
       } ${skipped ? 'opacity-60' : ''}`}
     >
       {/* the time, on the left of the line */}
       <span className="row-start-1 pt-2.5 text-right tabular-nums leading-tight">
         {start != null && (
-          <span className="block text-[13px] font-semibold text-slate-700 dark:text-slate-200">{fmtClock(start)}</span>
+          <span className="block text-xs font-semibold text-slate-700 sm:text-[13px] dark:text-slate-200">
+            {fmtClock(start)}
+          </span>
         )}
         {end != null && end !== start && (
-          <span className="block text-[11px] text-slate-400 dark:text-slate-500">{fmtClock(end % 1440)}</span>
+          <span className="block text-xs font-semibold text-slate-400 sm:text-[13px] dark:text-slate-500">
+            {fmtClock(end % 1440)}
+          </span>
         )}
       </span>
 

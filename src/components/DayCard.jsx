@@ -143,7 +143,7 @@ export default function DayCard({
         <button
           onClick={onAddItem}
           style={{ viewTransitionName: vtName('add', day.id) }}
-          className={`${day.items.length > 0 ? 'ml-24 mt-1 w-[calc(100%-6rem)] ' : 'w-full '}flex items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-300`}
+          className={`${day.items.length > 0 ? 'mt-1 ml-[5.5rem] w-[calc(100%-5.5rem)] sm:ml-24 sm:w-[calc(100%-6rem)] ' : 'w-full '}flex items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-300`}
         >
           <IconPlus className="size-4" />
           {day.items.length === 0 ? 'Plan this day — flight, hotel, places…' : 'Add more'}
