@@ -26,7 +26,11 @@ function paint(el, pin, selected) {
   el.classList.add('map-pin', `map-pin--${pin.state}`)
   el.classList.toggle('map-pin--guess', pin.guess)
   el.classList.toggle('map-pin--selected', selected)
-  el.innerHTML = pin.state === 'done' ? CHECK : `<span>${pin.n}</span>`
+  // the trip map colours each day's open pins its own way
+  el.style.background =
+    pin.color && (pin.state === 'open' || pin.state === 'now')
+      ? pin.color
+      : (el.innerHTML = pin.state === 'done' ? CHECK : `<span>${pin.n}</span>`)
   el.setAttribute('aria-label', [`${pin.n}. ${pin.title}`, WORD[pin.state]].filter(Boolean).join(', '))
 }
 
@@ -34,8 +38,22 @@ function paint(el, pin, selected) {
 // the map has no place to put the line.
 function drawRoute(map, pins) {
   if (!map.styleReady) return
-  const coordinates = pins.filter(p => p.state !== 'skipped').map(p => [p.lng, p.lat])
-  const data = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } }
+  // one line per group (a day), in that day's colour when it has one
+  const groups = new Map()
+  for (const p of pins) {
+    if (p.state === 'skipped') continue
+    const key = p.group ?? ''
+    if (!groups.has(key)) groups.set(key, { color: p.color, coordinates: [] })
+    groups.get(key).coordinates.push([p.lng, p.lat])
+  }
+  const data = {
+    type: 'FeatureCollection',
+    features: [...groups.values()].map(g => ({
+      type: 'Feature',
+      properties: g.color ? { color: g.color } : {},
+      geometry: { type: 'LineString', coordinates: g.coordinates },
+    })),
+  }
   const source = map.getSource(ROUTE)
   if (source) return source.setData(data)
   map.addSource(ROUTE, { type: 'geojson', data })
@@ -45,7 +63,7 @@ function drawRoute(map, pins) {
     source: ROUTE,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color': map.darkStyle ? '#7fdccf' : '#1a7a72',
+      'line-color': ['coalesce', ['get', 'color'], map.darkStyle ? '#7fdccf' : '#1a7a72'],
       'line-width': 3,
       'line-opacity': 0.85,
       'line-dasharray': [1.2, 1.6],

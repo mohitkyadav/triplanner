@@ -517,7 +517,7 @@ export default function Today({ id, navigate }) {
           <div onTouchStart={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
             <DayMapPanel
               trip={trip}
-              day={day}
+              days={[day]}
               runningId={plan.running ? plan.hero.item.id : null}
               onStatus={setStatus}
               onEdit={item => setItemModal({ dayId: day.id, item })}

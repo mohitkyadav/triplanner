@@ -37,7 +37,8 @@ export function daySummary(day) {
   if (starts.length) {
     const from = Math.min(...starts)
     const to = Math.max(...ends)
-    parts.push(to > from ? `${fmtClock(from)}–${fmtClock(to % 1440)}` : fmtClock(from))
+    // a last plan that ends after midnight (a night flight) says so
+    parts.push(to > from ? `${fmtClock(from)}–${fmtClock(to % 1440)}${to >= 1440 ? ' +1' : ''}` : fmtClock(from))
   }
 
   const spots = items

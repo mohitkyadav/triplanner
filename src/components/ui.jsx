@@ -83,6 +83,12 @@ export const IconShrink = p => (
     <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
   </Svg>
 )
+export const IconBackpack = p => (
+  <Svg {...p}>
+    <path d="M6 9a6 6 0 0 1 12 0v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9z" />
+    <path d="M10 3.5V3a2 2 0 0 1 4 0v.5M9 21v-5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v5M9 11h6" />
+  </Svg>
+)
 export const IconGrip = p => (
   <Svg {...p} stroke="none" fill="currentColor">
     <circle cx="9" cy="6" r="1.4" />
@@ -406,6 +412,35 @@ export function CountUp({ value, format = String, duration = 700 }) {
     return () => cancelAnimationFrame(frame)
   }, [value, duration])
   return format(shown)
+}
+
+/* A small card that opens a panel: an icon, a name and one line of status.
+   Two sit side by side (Packing, Budget). tone 'danger' turns the line red. */
+export function Tile({ icon: Icon, title, line, tone, badge, onClick, style }) {
+  return (
+    <button
+      onClick={onClick}
+      style={style}
+      className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-white p-3 text-left shadow-sm ring-1 ring-slate-200 transition hover:ring-brand-300 active:scale-[.99] dark:bg-slate-900 dark:ring-slate-800 dark:hover:ring-brand-600"
+    >
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent/15 text-amber-700 dark:text-amber-400">
+        <Icon className="size-4.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1 text-sm font-semibold">
+          {title}
+          {badge}
+        </span>
+        <span
+          className={`block truncate text-xs ${
+            tone === 'danger' ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          {line}
+        </span>
+      </span>
+    </button>
+  )
 }
 
 /* Text whose characters roll up into place when they change — a countdown

@@ -4,14 +4,30 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { fmtDate } from '../lib/dates'
 import { dayRouteUrl } from '../lib/maps'
 import { dayCost, fmtMoney } from '../lib/money'
-import { useStore } from '../lib/store'
 import { vtName } from '../lib/motion'
+import { useStore } from '../lib/store'
+import { daySummary, legBetween } from '../lib/timeline'
 import DayMapPanel, { mappable } from './DayMapPanel'
 import ItemCard from './ItemCard'
-import { daySummary, legBetween } from '../lib/timeline'
-import { IconBed, IconMap, IconPencil, IconPlus, IconRoute, IconTrash, iconBtn, Menu, Modal, useToast } from './ui'
+import {
+  IconBed,
+  IconCheck,
+  IconChevronDown,
+  IconMap,
+  IconPencil,
+  IconPlus,
+  IconRoute,
+  IconTrash,
+  iconBtn,
+  Menu,
+  Modal,
+  useToast,
+} from './ui'
 import WeatherChip from './WeatherChip'
 
+/* One day of the trip: its header, a line that sums it up, and its plans
+   as a timeline. During a trip, days already behind fold into one line
+   (`folded`) until tapped. */
 export default function DayCard({
   trip,
   day,
@@ -20,6 +36,8 @@ export default function DayCard({
   weather,
   isPast,
   isToday,
+  folded,
+  onUnfold,
   onEditDay,
   onAddItem,
   onEditItem,
@@ -29,6 +47,7 @@ export default function DayCard({
   const toast = useToast()
   // Makes the whole day a drop target so items can be dragged into empty days.
   const { setNodeRef, isOver } = useDroppable({ id: day.id })
+  const [mapOpen, setMapOpen] = useState(false)
 
   function setItemStatus(itemId, status) {
     // no page transition: the circle animates itself, and taps stay quick
@@ -43,19 +62,55 @@ export default function DayCard({
     })
   }
 
-  const [mapOpen, setMapOpen] = useState(false)
   const cost = dayCost(trip, day)
-  // "3 stops · 09:50–13:30 · 6.4 km · €62"
+  // "3 stops · 09:50–13:30 · 6.4 km · €62", then where you sleep
   const summary = [daySummary(day), cost > 0 && fmtMoney(cost, trip.currency)].filter(Boolean).join(' · ')
   const routeUrl = dayRouteUrl(trip, day)
+  const section = {
+    id: `day-${day.id}`,
+    'data-day': day.id,
+    style: { viewTransitionName: vtName('day', day.id) },
+  }
+
+  if (folded) {
+    const done = day.items.filter(i => i.status === 'done').length
+    const all = day.items.filter(i => i.status !== 'skipped').length
+    return (
+      <section {...section} className="scroll-mt-28">
+        <button
+          onClick={onUnfold}
+          className="flex w-full items-center gap-2 rounded-xl px-1 py-1.5 text-left transition hover:bg-slate-100 dark:hover:bg-slate-900"
+          aria-expanded="false"
+          aria-label={`Day ${index + 1}, ${done} of ${all} done — show its plans`}
+        >
+          <span className="shrink-0 font-bold text-slate-500 dark:text-slate-400">Day {index + 1}</span>
+          {day.date && <span className="shrink-0 text-sm text-slate-400 dark:text-slate-500">{fmtDate(day.date)}</span>}
+          {day.title && (
+            <span className="min-w-0 truncate text-sm text-slate-400 dark:text-slate-500">· {day.title}</span>
+          )}
+          <span className="flex-1" />
+          {all > 0 && (
+            <span
+              className={`inline-flex shrink-0 items-center gap-1 text-xs font-semibold ${
+                done === all ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+              }`}
+            >
+              {done === all && <IconCheck className="size-3.5" />}
+              {done} of {all} done
+            </span>
+          )}
+          <IconChevronDown className="size-4 shrink-0 text-slate-400" />
+        </button>
+      </section>
+    )
+  }
 
   return (
     <section
-      id={`day-${day.id}`}
-      style={{ viewTransitionName: vtName('day', day.id) }}
-      className={`scroll-mt-18 transition-opacity duration-300 ${isPast ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''}`}
+      {...section}
+      className={`scroll-mt-28 transition-opacity duration-300 ${isPast ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''}`}
     >
-      <div className={`flex items-center gap-2 px-1 ${summary ? 'mb-0.5' : 'mb-2.5'}`}>
+      <div className={`flex items-center gap-2 px-1 ${summary || stays.length ? 'mb-0.5' : 'mb-2.5'}`}>
         <h2 className="shrink-0 whitespace-nowrap text-lg font-bold">Day {index + 1}</h2>
         {day.date && (
           <span className="shrink-0 whitespace-nowrap text-sm font-medium text-slate-500 dark:text-slate-400">
@@ -100,19 +155,22 @@ export default function DayCard({
           ]}
         />
       </div>
-      {summary && (
-        <p className="mb-2.5 px-1 text-xs font-medium tabular-nums text-slate-400 dark:text-slate-500">{summary}</p>
+      {(summary || stays.length > 0) && (
+        <p className="mb-2.5 flex flex-wrap items-center gap-x-1.5 px-1 text-xs font-medium tabular-nums text-slate-400 dark:text-slate-500">
+          {summary && <span>{summary}</span>}
+          {stays.map(name => (
+            <span
+              key={name}
+              className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-300"
+              title={`Staying at ${name}`}
+            >
+              {summary && <span className="text-slate-300 dark:text-slate-600">·</span>}
+              <IconBed className="size-3.5" />
+              {name}
+            </span>
+          ))}
+        </p>
       )}
-
-      {stays.map(name => (
-        <div
-          key={name}
-          className="mb-2 flex items-center gap-2.5 rounded-xl border border-dashed border-violet-300/70 bg-violet-50/60 px-3.5 py-2.5 text-sm font-medium text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/5 dark:text-violet-300"
-        >
-          <IconBed className="size-4 shrink-0" />
-          <span className="min-w-0 truncate">Staying at {name}</span>
-        </div>
-      ))}
 
       <div
         ref={setNodeRef}
@@ -140,20 +198,33 @@ export default function DayCard({
           )}
         </SortableContext>
 
-        <button
-          onClick={onAddItem}
-          style={{ viewTransitionName: vtName('add', day.id) }}
-          className={`${day.items.length > 0 ? 'mt-1 ml-[5.5rem] w-[calc(100%-5.5rem)] sm:ml-24 sm:w-[calc(100%-6rem)] ' : 'w-full '}flex items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-300`}
-        >
-          <IconPlus className="size-4" />
-          {day.items.length === 0 ? 'Plan this day — flight, hotel, places…' : 'Add more'}
-        </button>
+        {day.items.length === 0 ? (
+          <button
+            onClick={onAddItem}
+            style={{ viewTransitionName: vtName('add', day.id) }}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-300"
+          >
+            <IconPlus className="size-4" />
+            Plan this day — flight, hotel, places…
+          </button>
+        ) : (
+          // a light "add" at the end of the line, under the cards
+          <button
+            onClick={onAddItem}
+            style={{ viewTransitionName: vtName('add', day.id) }}
+            className="ml-[5.75rem] mt-0.5 inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 transition hover:bg-brand-50 sm:ml-[6.25rem] dark:text-brand-300 dark:hover:bg-brand-500/10"
+            aria-label={`Add a plan to day ${index + 1}`}
+          >
+            <IconPlus className="size-4" />
+            Add
+          </button>
+        )}
       </div>
       {mapOpen && (
         <Modal title={`Day ${index + 1} on the map`} onClose={() => setMapOpen(false)}>
           <DayMapPanel
             trip={trip}
-            day={day}
+            days={[day]}
             className="h-[52dvh]"
             routeUrl={routeUrl}
             onStatus={(item, status) => setItemStatus(item.id, status)}

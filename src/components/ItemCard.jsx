@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
-import { catById, flightRoute, titleFor } from '../lib/categories'
+import { airportCity, catById, flightCodes, titleFor } from '../lib/categories'
 import { placeLinks } from '../lib/maps'
 import { costCurrency, fmtMoney } from '../lib/money'
 import { vtName } from '../lib/motion'
@@ -114,7 +114,12 @@ function Card({
   const meta = []
   if (item.type === 'flight') {
     if (airline) meta.push(airline.name)
-    if (item.title && flightRoute(item)) meta.push(flightRoute(item))
+    // The title has the codes (FRA → DEL); here the cities, or the codes
+    // when the plan has a label of its own.
+    const cities = [airportCity(item.from), airportCity(item.to)]
+    if (item.title) meta.push(flightCodes(item))
+    else if (cities.every(Boolean) && cities.join() !== flightCodes(item).split(' → ').join())
+      meta.push(cities.join(' → '))
   } else {
     if (item.type === 'hotel') meta.push(item.hotelAction === 'check-out' ? 'Check-out' : 'Check-in')
     const where = whereOf(item, title)
@@ -144,11 +149,12 @@ function Card({
   return (
     <li
       ref={dragRef}
+      id={overlay ? undefined : `plan-${item.id}`}
       {...rowProps}
       style={
         overlay ? dragStyle : { ...dragStyle, viewTransitionName: vtName('plan', item.id), viewTransitionClass: 'plan' }
       }
-      className={`group/plan grid select-none grid-cols-[2.25rem_2rem_minmax(0,1fr)] sm:grid-cols-[2.75rem_2rem_minmax(0,1fr)] gap-x-2.5 [-webkit-touch-callout:none] [touch-action:manipulation] ${
+      className={`group/plan grid scroll-mt-40 select-none grid-cols-[2.25rem_2rem_minmax(0,1fr)] sm:grid-cols-[2.75rem_2rem_minmax(0,1fr)] gap-x-2.5 [-webkit-touch-callout:none] [touch-action:manipulation] ${
         ghost ? 'opacity-40' : ''
       } ${skipped ? 'opacity-60' : ''}`}
     >
@@ -162,6 +168,12 @@ function Card({
         {end != null && end !== start && (
           <span className="block text-xs font-semibold text-slate-400 sm:text-[13px] dark:text-slate-500">
             {fmtClock(end % 1440)}
+            {/* the next day */}
+            {end >= 1440 && (
+              <span className="block text-[10px] font-bold leading-none text-amber-600 dark:text-amber-400">
+                +1 day
+              </span>
+            )}
           </span>
         )}
       </span>

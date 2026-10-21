@@ -6,14 +6,14 @@ import {
   btnChip,
   btnGhost,
   btnPrimary,
-  Collapse,
   CountUp,
   Field,
   IconAlert,
-  IconChevronDown,
   IconPencil,
+  IconWallet,
   inputCls,
   Modal,
+  Tile,
 } from './ui'
 import CategoryIcon from './CategoryIcon'
 
@@ -42,127 +42,115 @@ export default function BudgetCard({ trip }) {
   const line = nothing
     ? 'No costs yet'
     : sum.budget != null
-      ? `${fmtMoney(sum.planned, cur)} of ${fmtMoney(sum.budget, cur)}${over ? ' — over budget' : ''}`
-      : `${fmtMoney(sum.planned, cur)} planned · ${fmtMoney(sum.paid, cur)} paid`
+      ? `${fmtMoney(sum.planned, cur)} / ${fmtMoney(sum.budget, cur)}`
+      : `${fmtMoney(sum.planned, cur)} planned`
 
   return (
-    <section
-      className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
-      style={{ viewTransitionName: 'budget' }}
-    >
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="focus-inset flex w-full items-center gap-3 rounded-2xl px-5 py-3.5 text-left"
-        aria-expanded={open}
-      >
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 text-lg">💶</span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">Budget</span>
-          <span
-            className={`block truncate text-xs ${over ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`}
-          >
-            {line}
-          </span>
-        </span>
-        {sum.missingRates.length > 0 && <IconAlert className="size-4 shrink-0 text-amber-500" />}
-        <IconChevronDown
-          className={`size-4.5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
+    <>
+      <Tile
+        icon={IconWallet}
+        title="Budget"
+        line={line}
+        tone={over ? 'danger' : undefined}
+        badge={sum.missingRates.length > 0 ? <IconAlert className="size-3.5 text-amber-500" /> : null}
+        onClick={() => setOpen(true)}
+        style={{ viewTransitionName: 'budget' }}
+      />
+      {open && (
+        <Modal title="Budget" onClose={() => setOpen(false)}>
+          <div className="space-y-4 pb-1 text-sm">
+            {sum.budget != null && (
+              <div className="space-y-1.5">
+                <Bar value={sum.planned} max={sum.budget} tone={over ? 'bg-rose-500' : 'bg-brand-500'} />
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {over
+                    ? `${fmtMoney(sum.planned - sum.budget, cur)} over`
+                    : `${fmtMoney(sum.budget - sum.planned, cur)} left`}
+                </p>
+              </div>
+            )}
 
-      <Collapse open={open}>
-        <div className="space-y-4 border-t border-slate-100 px-5 pb-4 pt-3 text-sm dark:border-slate-800">
-          {sum.budget != null && (
-            <div className="space-y-1.5">
-              <Bar value={sum.planned} max={sum.budget} tone={over ? 'bg-rose-500' : 'bg-brand-500'} />
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {over
-                  ? `${fmtMoney(sum.planned - sum.budget, cur)} over`
-                  : `${fmtMoney(sum.budget - sum.planned, cur)} left`}
+            <dl className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+                <dt className="text-xs text-slate-500 dark:text-slate-400">Planned</dt>
+                <dd className="text-base font-bold tabular-nums">
+                  <CountUp value={sum.planned} format={v => fmtMoney(v, cur)} />
+                </dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+                <dt className="text-xs text-slate-500 dark:text-slate-400">Paid so far</dt>
+                <dd className="text-base font-bold tabular-nums">
+                  <CountUp value={sum.paid} format={v => fmtMoney(v, cur)} />
+                </dd>
+              </div>
+            </dl>
+
+            {sum.missingRates.length > 0 && (
+              <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] text-amber-800 dark:bg-amber-400/10 dark:text-amber-300">
+                <IconAlert className="mt-0.5 size-4 shrink-0" />
+                Costs in {sum.missingRates.join(', ')} are left out until you add an exchange rate.
               </p>
-            </div>
-          )}
+            )}
 
-          <dl className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
-              <dt className="text-xs text-slate-500 dark:text-slate-400">Planned</dt>
-              <dd className="text-base font-bold tabular-nums">
-                <CountUp value={sum.planned} format={v => fmtMoney(v, cur)} />
-              </dd>
-            </div>
-            <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
-              <dt className="text-xs text-slate-500 dark:text-slate-400">Paid so far</dt>
-              <dd className="text-base font-bold tabular-nums">
-                <CountUp value={sum.paid} format={v => fmtMoney(v, cur)} />
-              </dd>
-            </div>
-          </dl>
-
-          {sum.missingRates.length > 0 && (
-            <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] text-amber-800 dark:bg-amber-400/10 dark:text-amber-300">
-              <IconAlert className="mt-0.5 size-4 shrink-0" />
-              Costs in {sum.missingRates.join(', ')} are left out until you add an exchange rate.
-            </p>
-          )}
-
-          {sum.byCategory.length > 0 && (
-            <ul className="space-y-2">
-              {sum.byCategory.map(({ type, amount }) => {
-                const cat = catById(type)
-                return (
-                  <li key={type} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium">
-                        <CategoryIcon type={type} className="mr-1 inline size-3.5 align-[-2px]" />
-                        {cat.label}
-                      </span>
-                      <span className="tabular-nums text-slate-500 dark:text-slate-400">{fmtMoney(amount, cur)}</span>
-                    </div>
-                    <Bar value={amount} max={sum.byCategory[0].amount} />
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-
-          {sum.split && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                Split · {fmtMoney(sum.split.share, cur)} each
-              </h3>
-              <ul className="space-y-1">
-                {sum.split.balances.map(b => (
-                  <li key={b.name} className="flex justify-between text-xs">
-                    <span className="font-medium">{b.name}</span>
-                    <span className="tabular-nums text-slate-500 dark:text-slate-400">
-                      paid {fmtMoney(b.paid, cur)}
-                    </span>
-                  </li>
-                ))}
+            {sum.byCategory.length > 0 && (
+              <ul className="space-y-2">
+                {sum.byCategory.map(({ type, amount }) => {
+                  const cat = catById(type)
+                  return (
+                    <li key={type} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">
+                          <CategoryIcon type={type} className="mr-1 inline size-3.5 align-[-2px]" />
+                          {cat.label}
+                        </span>
+                        <span className="tabular-nums text-slate-500 dark:text-slate-400">{fmtMoney(amount, cur)}</span>
+                      </div>
+                      <Bar value={amount} max={sum.byCategory[0].amount} />
+                    </li>
+                  )
+                })}
               </ul>
-              {sum.split.settlements.length === 0 ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">Everyone is even.</p>
-              ) : (
+            )}
+
+            {sum.split && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Split · {fmtMoney(sum.split.share, cur)} each
+                </h3>
                 <ul className="space-y-1">
-                  {sum.split.settlements.map(s => (
-                    <li key={`${s.from}-${s.to}`} className="text-xs font-semibold">
-                      {s.from} owes {s.to} {fmtMoney(s.amount, cur)}
+                  {sum.split.balances.map(b => (
+                    <li key={b.name} className="flex justify-between text-xs">
+                      <span className="font-medium">{b.name}</span>
+                      <span className="tabular-nums text-slate-500 dark:text-slate-400">
+                        paid {fmtMoney(b.paid, cur)}
+                      </span>
                     </li>
                   ))}
                 </ul>
-              )}
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                Only costs with a “Paid by” are split. Set it in each plan.
-              </p>
-            </div>
-          )}
+                {sum.split.settlements.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Everyone is even.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {sum.split.settlements.map(s => (
+                      <li key={`${s.from}-${s.to}`} className="text-xs font-semibold">
+                        {s.from} owes {s.to} {fmtMoney(s.amount, cur)}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  Only costs with a “Paid by” are split. Set it in each plan.
+                </p>
+              </div>
+            )}
 
-          <button className={btnChip} onClick={() => setEditing(true)}>
-            <IconPencil className="size-3.5" />
-            Budget, travellers and rates
-          </button>
-        </div>
-      </Collapse>
+            <button className={btnChip} onClick={() => setEditing(true)}>
+              <IconPencil className="size-3.5" />
+              Budget, travellers and rates
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {editing && (
         <BudgetForm
@@ -174,7 +162,7 @@ export default function BudgetCard({ trip }) {
           }}
         />
       )}
-    </section>
+    </>
   )
 }
 

@@ -101,10 +101,31 @@ export function flightRoute(item) {
   return to ? `→ ${to}` : ''
 }
 
+// "Frankfurt (FRA)" → "FRA"; "LIS" stays; a bare city name stays as it is.
+export function airportCode(text) {
+  const t = String(text ?? '').trim()
+  return t.match(/\(([A-Z]{3})\)\s*$/)?.[1] ?? t
+}
+
+// "Frankfurt (FRA)" → "Frankfurt"
+export const airportCity = text =>
+  String(text ?? '')
+    .trim()
+    .replace(/\s*\([A-Z]{3}\)\s*$/, '')
+
+// "FRA → DEL": the short route, for titles that must fit one line.
+export function flightCodes(item) {
+  const from = airportCode(item.from)
+  const to = airportCode(item.to)
+  if (from && to) return `${from} → ${to}`
+  if (from) return `${from} →`
+  return to ? `→ ${to}` : ''
+}
+
 export function titleFor(item) {
   if (item.title) return item.title
   if (item.type === 'flight') {
-    const route = flightRoute(item)
+    const route = flightCodes(item)
     if (route && item.flightNo) return `${route} · ${item.flightNo}`
     return route || (item.flightNo ? `Flight ${item.flightNo}` : 'Flight')
   }

@@ -41,6 +41,7 @@ describe('Triplanner', () => {
     const user = userEvent.setup()
     openApp([lisbon()], '/trip/trip-1')
 
+    await user.click(screen.getByRole('button', { name: 'More trip actions' }))
     await user.click(screen.getByRole('button', { name: 'Edit trip' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit trip' })
     // The end date follows the start, so the trip keeps its length.

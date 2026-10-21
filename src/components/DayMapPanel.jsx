@@ -39,24 +39,28 @@ export const mappable = day => day.items.filter(i => i.type !== 'flight')
    ask again and again; editing the plan's place tries again. */
 const tried = new Set()
 
-function useGuesses(trip, day, center) {
+function useGuesses(trip, days, center) {
   const { dispatch } = useStore()
   const [on] = useOnlineEnabled()
-  const todo = mappable(day).filter(i => !i.geo && !tried.has(`${i.id}:${placeText(i)}:${i.place}`))
-  const key = todo.map(i => i.id).join(',')
+  const todo = days.flatMap(d =>
+    mappable(d)
+      .filter(i => !i.geo && !tried.has(`${i.id}:${placeText(i)}:${i.place}`))
+      .map(item => ({ item, dayId: d.id })),
+  )
+  const key = todo.map(t => t.item.id).join(',')
 
   useEffect(() => {
     if (!on || !center || !key) return
     const ctrl = new AbortController()
     ;(async () => {
-      for (const item of todo) {
+      for (const { item, dayId } of todo) {
         if (ctrl.signal.aborted) return
         tried.add(`${item.id}:${placeText(item)}:${item.place}`)
         try {
           const geo = await guessSpot(item, center, ctrl.signal)
           if (geo && !ctrl.signal.aborted) {
             const patch = { geo }
-            dispatch({ type: 'item/update', tripId: trip.id, dayId: day.id, itemId: item.id, patch, animate: false })
+            dispatch({ type: 'item/update', tripId: trip.id, dayId, itemId: item.id, patch, animate: false })
           }
         } catch {
           tried.delete(`${item.id}:${placeText(item)}:${item.place}`)
@@ -68,15 +72,21 @@ function useGuesses(trip, day, center) {
     return () => ctrl.abort()
     // `todo` follows from `key`
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, center, key, trip.id, day.id, dispatch])
+  }, [on, center, key, trip.id, dispatch])
 }
 
-/* The map for one day, with the card of the pin tapped on it. Marking a
-   plan done here or in the list shows on both at once. The map can go full
-   screen (the same map, moved), where the card floats over its bottom.
+// One colour per day on the trip map, in order.
+export const DAY_COLORS = ['#0ea5e9', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
 
-   runningId: the plan under way now (Trip mode), drawn pulsing. */
-export default function DayMapPanel({ trip, day, runningId, routeUrl, onStatus, onEdit, className = 'h-64' }) {
+/* The map for one day — or several, as the trip map — with the card of the
+   pin tapped on it. Marking a plan done here or in the list shows on both at
+   once. The map can go full screen (the same map, moved), where the card
+   floats over its bottom. With several days, each has its own colour, its
+   own line, and a chip to show it alone.
+
+   runningId: the plan under way now (Trip mode), drawn pulsing.
+   onStatus(item, status, dayId), onEdit(item, dayId). */
+export default function DayMapPanel({ trip, days, runningId, routeUrl, onStatus, onEdit, className = 'h-64' }) {
   const [on] = useOnlineEnabled()
   const center = useDestinationCenter(trip.destination)
   const [styleId, setStyleId] = useMapStyle()
@@ -84,28 +94,40 @@ export default function DayMapPanel({ trip, day, runningId, routeUrl, onStatus, 
   const [full, setFull] = useState(false)
   const [inlineHost, setInlineHost] = useState(null)
   const [fullHost, setFullHost] = useState(null)
-  useGuesses(trip, day, center)
+  const [onlyDay, setOnlyDay] = useState(null) // trip map: one day alone
+  useGuesses(trip, days, center)
 
-  const items = mappable(day)
+  const several = days.length > 1
+  // every plan with its day: which day of the trip, and its number that day
+  const entries = useMemo(
+    () =>
+      days.flatMap(d => {
+        const dayNo = trip.days.findIndex(x => x.id === d.id) + 1
+        return mappable(d).map((item, i) => ({ item, dayId: d.id, dayNo, n: i + 1 }))
+      }),
+    [days, trip.days],
+  )
   const pins = useMemo(
     () =>
-      mappable(day)
-        .map((item, i) => ({ item, n: i + 1 }))
-        .filter(({ item }) => item.geo)
-        .map(({ item, n }) => ({
+      entries
+        .filter(e => e.item.geo && (!onlyDay || e.dayId === onlyDay))
+        .map(({ item, dayId, dayNo, n }) => ({
           id: item.id,
           n,
           title: titleFor(item),
           lat: item.geo.lat,
           lng: item.geo.lng,
           guess: Boolean(item.geo.guess),
+          group: dayId,
+          color: several ? DAY_COLORS[(dayNo - 1) % DAY_COLORS.length] : undefined,
           state:
             item.status === 'done' || item.status === 'skipped' ? item.status : item.id === runningId ? 'now' : 'open',
         })),
-    [day, runningId],
+    [entries, onlyDay, several, runningId],
   )
-  const missing = items.filter(i => !i.geo).length
-  const selected = items.find(i => i.id === selectedId && i.geo)
+  const missing = entries.filter(e => !e.item.geo).length
+  const picked = entries.find(e => e.item.id === selectedId && e.item.geo)
+  const selected = picked?.item
   const at = pins.findIndex(p => p.id === selected?.id)
   // the next or previous stop on the map, going round
   const step = by => setSelectedId(pins[(at + by + pins.length) % pins.length]?.id ?? null)
@@ -122,10 +144,10 @@ export default function DayMapPanel({ trip, day, runningId, routeUrl, onStatus, 
     <PinCard
       trip={trip}
       item={selected}
-      n={pins[at]?.n}
+      n={several ? `Day ${picked.dayNo} · ${picked.n}` : picked.n}
       floating={full}
-      onStatus={status => onStatus(selected, status)}
-      onEdit={() => onEdit(selected)}
+      onStatus={status => onStatus(selected, status, picked.dayId)}
+      onEdit={() => onEdit(selected, picked.dayId)}
       onStep={pins.length > 1 ? step : null}
       onClose={() => setSelectedId(null)}
     />
@@ -134,6 +156,36 @@ export default function DayMapPanel({ trip, day, runningId, routeUrl, onStatus, 
 
   return (
     <div className="space-y-2">
+      {several && (
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
+          {[
+            { id: null, label: 'All days' },
+            ...days.map((d, i) => ({ id: d.id, label: `Day ${trip.days.indexOf(d) + 1}`, i })),
+          ].map(chip => (
+            <button
+              key={chip.id ?? 'all'}
+              onClick={() => {
+                setOnlyDay(chip.id)
+                setSelectedId(null)
+              }}
+              aria-pressed={onlyDay === chip.id}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold transition ${
+                onlyDay === chip.id
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+              }`}
+            >
+              {chip.id && (
+                <span
+                  className="size-2.5 rounded-full"
+                  style={{ background: DAY_COLORS[trip.days.findIndex(x => x.id === chip.id) % DAY_COLORS.length] }}
+                />
+              )}
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div
         className={`relative isolate overflow-hidden rounded-2xl bg-slate-100 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800 ${className}`}
       >

@@ -10,10 +10,12 @@ import {
 } from '@dnd-kit/core'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AirlineLogo from '../components/AirlineLogo'
 import BookingImport from '../components/BookingImport'
 import BudgetCard from '../components/Budget'
+import DayMapPanel, { mappable } from '../components/DayMapPanel'
+import DayStrip from '../components/DayStrip'
 import DayCard from '../components/DayCard'
 import DayForm from '../components/DayForm'
 import InviteModal from '../components/InviteModal'
@@ -34,25 +36,25 @@ import {
   IconPencil,
   IconPlaneLanding,
   IconPlaneTakeoff,
-  IconRadar,
   IconPlus,
   IconShare,
   IconTicket,
   IconTrash,
   IconUsers,
   Menu,
+  Modal,
   iconBtn,
   useToast,
 } from '../components/ui'
-import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
-import { flightRoute } from '../lib/categories'
+import { airlineFromFlightNo } from '../lib/airlines'
+import { flightCodes, titleFor } from '../lib/categories'
 import { addDaysISO, fmtDate, fmtRange, todayISO } from '../lib/dates'
 import { tripToICS } from '../lib/ics'
 import { takePendingBooking } from '../lib/inbox'
 import { cloneTrip, downloadFile, downloadJSON, exportPayload, slug } from '../lib/io'
 import { fmtMoney, tripCost } from '../lib/money'
 import { rescheduleDays } from '../lib/reschedule'
-import { fmtTimes } from '../lib/schedule'
+import { fmtClock, startOf } from '../lib/schedule'
 import { leaveTrip } from '../lib/shares'
 import { makeDay, placeByTime, sortDays, uid, useStore } from '../lib/store'
 import { syncEnabled } from '../lib/sync'
@@ -60,48 +62,40 @@ import { computeStays } from '../lib/stays'
 import { useWeather } from '../lib/weather'
 import { vtName } from '../lib/motion'
 
-// The first and the last flight of the trip, for the banner.
+// The first and the last flight of the trip, for the top card.
 function flightEndpoints(trip) {
   const flights = trip.days.flatMap(day => day.items.filter(i => i.type === 'flight').map(item => ({ item, day })))
   return { outbound: flights[0] ?? null, back: flights.length > 1 ? flights[flights.length - 1] : null }
 }
 
-function FlightRow({ icon: Icon, label, item, day }) {
+const weekday = date => (date ? new Date(`${date}T00:00`).toLocaleDateString(undefined, { weekday: 'short' }) : '')
+
+// "✈ FRA → DEL  Mon 07:10" — tap to go to the flight in its day.
+function FlightChip({ flight, icon: Icon, onShow }) {
+  const { item, day } = flight
   const airline = airlineFromFlightNo(item.flightNo)
-  const tracker = flightTrackerUrl(item.flightNo)
-  const sub = [airline?.name, fmtDate(day.date), fmtTimes(item), flightRoute(item)].filter(Boolean).join(' · ')
-  const planeChip = (
-    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
-      <Icon className="size-4.5" />
+  const start = startOf(item)
+  const plane = (
+    <span className="grid size-6 place-items-center rounded-md bg-sky-100 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300">
+      <Icon className="size-3.5" />
     </span>
   )
   return (
-    <div className="flex items-center gap-3 px-5 py-3">
+    <button
+      onClick={onShow}
+      className="inline-flex min-w-0 items-center gap-2 rounded-lg bg-slate-100 py-1.5 pl-1.5 pr-2.5 text-[13px] transition hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700"
+      aria-label={`${titleFor(item)}, ${[fmtDate(day.date), start != null && fmtClock(start)].filter(Boolean).join(' ')} — show it`}
+    >
       {airline ? (
-        <AirlineLogo iata={airline.iata} name={airline.name} className="size-9 rounded-lg" fallback={planeChip} />
+        <AirlineLogo iata={airline.iata} name={airline.name} className="size-6 rounded-md" fallback={plane} />
       ) : (
-        planeChip
+        plane
       )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">
-          {label}
-          {item.flightNo && <span className="font-medium text-slate-500 dark:text-slate-400"> · {item.flightNo}</span>}
-        </p>
-        {sub && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{sub}</p>}
-      </div>
-      {tracker && (
-        <a
-          className={iconBtn}
-          href={tracker}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Track flight ${item.flightNo}`}
-          title="Live flight status"
-        >
-          <IconRadar className="size-4.5" />
-        </a>
-      )}
-    </div>
+      <span className="truncate font-semibold">{flightCodes(item) || item.flightNo || 'Flight'}</span>
+      <span className="shrink-0 tabular-nums text-slate-500 dark:text-slate-400">
+        {[weekday(day.date), start != null && fmtClock(start)].filter(Boolean).join(' ')}
+      </span>
+    </button>
   )
 }
 
@@ -125,6 +119,11 @@ export default function TripView({ id, navigate }) {
     arrivals.current = !activeItem
   }, [activeItem])
   const dragSnapshot = useRef(null) // days before the drag, restored on cancel
+  const [unfolded, setUnfolded] = useState(() => new Set()) // past days opened again
+  const [tripMap, setTripMap] = useState(false)
+  const [activeDay, setActiveDay] = useState(null) // the day in view, for the strip and the + button
+  const heroTitle = useRef(null)
+  const [heroVisible, setHeroVisible] = useState(true)
   const icsRef = useRef(null)
 
   const weather = useWeather(trip)
@@ -146,6 +145,48 @@ export default function TripView({ id, navigate }) {
     const text = takePendingBooking(id)
     if (text) setBooking(text)
   }, [id])
+
+  // The header shows the trip's name once the big title has scrolled away.
+  useEffect(() => {
+    const el = heroTitle.current
+    if (!el || typeof IntersectionObserver !== 'function') return
+    const watch = new IntersectionObserver(([e]) => setHeroVisible(e.isIntersecting), {
+      rootMargin: '-56px 0px 0px 0px',
+    })
+    watch.observe(el)
+    return () => watch.disconnect()
+  }, [id])
+
+  // The day in view: the last one whose top has passed under the strip.
+  useEffect(() => {
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const sections = [...document.querySelectorAll('section[data-day]')]
+      if (sections.length === 0) return
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4
+      // none reached yet (the top of the page): nothing lit, the strip shows today
+      let current = null
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top <= 120) current = section.dataset.day
+        else break
+      }
+      setActiveDay(atBottom ? sections[sections.length - 1].dataset.day : current)
+    }
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [id, trip?.days.length, unfolded])
+
+  const mapDays = useMemo(() => (trip?.days ?? []).filter(d => mappable(d).length > 0), [trip?.days])
 
   // On opening a trip that spans today, smoothly scroll to the current day.
   useEffect(() => {
@@ -303,6 +344,36 @@ export default function TripView({ id, navigate }) {
   const dayOfItem = itemId => trip.days.find(d => d.items.some(i => i.id === itemId))
   const dayById = dayId => trip.days.find(d => d.id === dayId)
 
+  // During the trip, days already behind fold into one line until opened.
+  const isFolded = day => todayIndex >= 0 && Boolean(day.date) && day.date < today && !unfolded.has(day.id)
+  const unfold = dayId => setUnfolded(prev => new Set(prev).add(dayId))
+
+  // Goes to a day (opening it if folded), below the header and the strip.
+  function showDay(dayId) {
+    unfold(dayId)
+    requestAnimationFrame(() =>
+      document.getElementById(`day-${dayId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    )
+  }
+
+  // Goes to one plan and makes it glow once.
+  function showPlan({ item, day }) {
+    unfold(day.id)
+    requestAnimationFrame(() => {
+      const row = document.getElementById(`plan-${item.id}`)
+      if (!row) return
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const card = row.querySelector('.card-focus')
+      card?.classList.remove('anim-arrive')
+      void card?.offsetWidth // restart the glow
+      card?.classList.add('anim-arrive')
+    })
+  }
+
+  // The + button adds to the day in view, else today, else the first day.
+  const addDayId = activeDay ?? trip.days[Math.max(0, todayIndex)]?.id
+  const addDayNo = trip.days.findIndex(d => d.id === addDayId) + 1
+
   function handleDragStart({ active }) {
     dragSnapshot.current = trip.days
     setActiveItem(dayOfItem(active.id)?.items.find(i => i.id === active.id) ?? null)
@@ -357,7 +428,12 @@ export default function TripView({ id, navigate }) {
           <button className={iconBtn} onClick={() => navigate('')} aria-label="Back to trips">
             <IconArrowLeft />
           </button>
-          <h1 className="min-w-0 flex-1 truncate px-1 font-semibold">{trip.name}</h1>
+          {/* the name, once the big title above the days has scrolled away */}
+          <h1
+            className={`min-w-0 flex-1 truncate px-1 font-semibold transition-opacity duration-200 ${heroVisible ? 'opacity-0' : 'opacity-100'}`}
+          >
+            {trip.name}
+          </h1>
           <button
             className={iconBtn}
             onClick={() => navigate(`/trip/${trip.id}/today`)}
@@ -366,25 +442,16 @@ export default function TripView({ id, navigate }) {
           >
             <IconNavigation className="size-4.5" />
           </button>
-          {syncEnabled && !trip.sharedFrom && (
-            <button
-              className={iconBtn}
-              onClick={() => setInviting(true)}
-              aria-label="Invite people"
-              title="Invite people"
-            >
-              <IconUsers className="size-4.5" />
-            </button>
-          )}
           <button className={iconBtn} onClick={() => setSharing(true)} aria-label="Share trip">
             <IconShare className="size-4.5" />
-          </button>
-          <button className={iconBtn} onClick={() => setEditTrip(true)} aria-label="Edit trip">
-            <IconPencil className="size-4.5" />
           </button>
           <Menu
             label="More trip actions"
             items={[
+              { label: 'Edit trip', icon: IconPencil, onClick: () => setEditTrip(true) },
+              ...(syncEnabled && !trip.sharedFrom
+                ? [{ label: 'Invite people', icon: IconUsers, onClick: () => setInviting(true) }]
+                : []),
               { label: 'Import booking (.ics)', icon: IconTicket, onClick: () => icsRef.current?.click() },
               { label: 'Export to calendar (.ics)', icon: IconCalendarPlus, onClick: exportCalendar },
               { label: 'Export as JSON', icon: IconDownload, onClick: exportTrip },
@@ -396,8 +463,18 @@ export default function TripView({ id, navigate }) {
           />
         </div>
       </header>
+      {trip.days.length > 1 && (
+        <DayStrip
+          days={trip.days}
+          activeId={activeDay ?? trip.days[todayIndex]?.id ?? null}
+          today={today}
+          weather={weather}
+          onPick={showDay}
+          onMap={mapDays.length > 0 ? () => setTripMap(true) : null}
+        />
+      )}
 
-      <main className="mx-auto max-w-2xl space-y-8 px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-5">
+      <main className="mx-auto max-w-2xl space-y-8 px-4 pb-[max(7rem,env(safe-area-inset-bottom))] pt-5">
         <div
           className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
           style={{ viewTransitionName: vtName('trip', trip.id) }}
@@ -405,6 +482,7 @@ export default function TripView({ id, navigate }) {
         >
           <div className="p-5">
             <h2
+              ref={heroTitle}
               className="w-fit text-2xl font-bold tracking-tight"
               style={{ viewTransitionName: vtName('trip-title', trip.id) }}
               data-vt-shared
@@ -436,14 +514,9 @@ export default function TripView({ id, navigate }) {
             </p>
           </div>
           {outbound && (
-            <div className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
-              <FlightRow
-                icon={IconPlaneTakeoff}
-                label={back ? 'Outbound' : 'Flight'}
-                item={outbound.item}
-                day={outbound.day}
-              />
-              {back && <FlightRow icon={IconPlaneLanding} label="Return" item={back.item} day={back.day} />}
+            <div className="flex flex-wrap gap-2 border-t border-slate-100 px-5 py-3 dark:border-slate-800">
+              <FlightChip flight={outbound} icon={IconPlaneTakeoff} onShow={() => showPlan(outbound)} />
+              {back && <FlightChip flight={back} icon={IconPlaneLanding} onShow={() => showPlan(back)} />}
             </div>
           )}
           {todayIndex >= 0 && (
@@ -467,8 +540,10 @@ export default function TripView({ id, navigate }) {
           )}
         </div>
 
-        <PackingList trip={trip} />
-        <BudgetCard trip={trip} />
+        <div className="grid grid-cols-2 gap-3">
+          <PackingList trip={trip} />
+          <BudgetCard trip={trip} />
+        </div>
 
         <DndContext
           sensors={sensors}
@@ -489,6 +564,8 @@ export default function TripView({ id, navigate }) {
               weather={weather?.[day.date]}
               isPast={Boolean(day.date) && day.date < today}
               isToday={day.date === today}
+              folded={isFolded(day)}
+              onUnfold={() => unfold(day.id)}
               onEditDay={() => setDayModal({ day, index: i })}
               onAddItem={() => setItemModal({ dayId: day.id })}
               onEditItem={item => setItemModal({ dayId: day.id, item })}
@@ -507,6 +584,37 @@ export default function TripView({ id, navigate }) {
         </button>
       </main>
 
+      {/* one + for the whole page: it adds to the day in view */}
+      {addDayId && (
+        <button
+          onClick={() => setItemModal({ dayId: addDayId })}
+          className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,calc((100vw-42rem)/2+1rem))] z-30 grid size-14 place-items-center rounded-full bg-brand text-white shadow-lg shadow-brand/30 transition hover:bg-brand-600 active:scale-95 dark:bg-brand-600 dark:hover:bg-brand-500"
+          aria-label={`Add a plan to day ${addDayNo}`}
+          title={`Add to day ${addDayNo}`}
+        >
+          <IconPlus className="size-6" />
+        </button>
+      )}
+      {tripMap && (
+        <Modal title="Trip map" onClose={() => setTripMap(false)}>
+          <DayMapPanel
+            trip={trip}
+            days={mapDays}
+            className="h-[56dvh]"
+            onStatus={(item, status, dayId) =>
+              dispatch({
+                type: 'item/update',
+                tripId: trip.id,
+                dayId,
+                itemId: item.id,
+                patch: { status },
+                animate: false,
+              })
+            }
+            onEdit={(item, dayId) => setItemModal({ dayId, item })}
+          />
+        </Modal>
+      )}
       {itemModal && (
         <ItemForm
           initial={itemModal.item}
