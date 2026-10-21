@@ -143,6 +143,7 @@ const SHORT = {
 export function AccountMenu() {
   const session = useSession()
   const sync = useSyncStatus()
+  const [openedAt] = useState(sync.at) // the sync already done when the app opened
   const membership = useMembership()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -188,6 +189,13 @@ export function AccountMenu() {
           ) : (
             <span
               className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-slate-50 dark:ring-slate-950 ${DOT[state]}`}
+            />
+          )}
+          {/* a ripple each time a sync lands (not for the one already done on opening) */}
+          {state === 'synced' && sync.at && sync.at !== openedAt && (
+            <span
+              key={sync.at}
+              className="anim-ripple pointer-events-none absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500"
             />
           )}
         </span>

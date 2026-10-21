@@ -373,6 +373,156 @@ html[data-vt='theme']::view-transition-new(root) {
   animation: drain linear forwards;
 }
 
+/* a character that changed rolls up into place (RollingText) */
+@keyframes roll {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+  }
+}
+.anim-roll {
+  animation: roll 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* two plans that clash shake once; free time fades in */
+@keyframes shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20%,
+  60% {
+    transform: translateX(-3px);
+  }
+  40%,
+  80% {
+    transform: translateX(3px);
+  }
+}
+.anim-shake {
+  animation: shake 0.45s ease-in-out 0.2s;
+}
+.anim-fade {
+  animation: fade-in 0.6s ease-out both;
+}
+
+/* weather icons, each with a gentle loop of its own */
+@keyframes wx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes wx-drift {
+  50% {
+    transform: translateX(2px);
+  }
+}
+@keyframes wx-bob {
+  50% {
+    transform: translateY(1.5px);
+  }
+}
+@keyframes wx-sway {
+  25% {
+    transform: rotate(-6deg);
+  }
+  75% {
+    transform: rotate(6deg);
+  }
+}
+@keyframes wx-flash {
+  0%,
+  88%,
+  100% {
+    opacity: 1;
+  }
+  90%,
+  94% {
+    opacity: 0.45;
+  }
+}
+@keyframes wx-haze {
+  50% {
+    opacity: 0.55;
+  }
+}
+.wx-sun {
+  animation: wx-spin 14s linear infinite;
+}
+.wx-cloud {
+  animation: wx-drift 4s ease-in-out infinite;
+}
+.wx-rain {
+  animation: wx-bob 1.6s ease-in-out infinite;
+}
+.wx-snow {
+  animation: wx-sway 3s ease-in-out infinite;
+}
+.wx-storm {
+  animation: wx-flash 3.5s linear infinite;
+}
+.wx-fog {
+  animation: wx-haze 3s ease-in-out infinite;
+}
+
+/* the empty home screen: the suitcase bobs, the button breathes a few times */
+@keyframes bob {
+  50% {
+    transform: translateY(-6px) rotate(-3deg);
+  }
+}
+.anim-bob {
+  display: inline-block;
+  animation: bob 2.8s ease-in-out infinite;
+}
+@keyframes breathe {
+  50% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-brand-500) 22%, transparent);
+  }
+}
+.anim-breathe {
+  animation: breathe 2.2s ease-in-out 0.8s 4;
+}
+
+/* the new-version banner drops in from the top */
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-140%);
+  }
+}
+.anim-drop {
+  animation: drop 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* a sync that lands sends a ripple out of the account dot */
+@keyframes ripple {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+.anim-ripple {
+  animation: ripple 0.9s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-roll,
+  .anim-shake,
+  .anim-fade,
+  .anim-bob,
+  .anim-breathe,
+  .anim-drop,
+  .anim-ripple,
+  [class*='wx-'] {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-pop,
   .anim-sheet,

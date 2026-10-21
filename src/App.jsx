@@ -65,7 +65,7 @@ function UpdateNotice() {
   if (!apply) return null
   return (
     <div className="fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-60 flex justify-center px-4">
-      <div className="anim-toast flex items-center gap-3 rounded-full bg-slate-900 py-1.5 pl-4 pr-1.5 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900">
+      <div className="anim-drop flex items-center gap-3 rounded-full bg-slate-900 py-1.5 pl-4 pr-1.5 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-slate-900">
         A new version is ready
         <button className={btnChipBrand} onClick={() => apply()}>
           Reload

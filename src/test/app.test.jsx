@@ -164,7 +164,10 @@ describe('Triplanner', () => {
     await user.click(within(dialog).getByRole('radio', { name: /Flight/ }))
     await user.type(within(dialog).getByLabelText('Flight number'), 'lh 1178')
 
-    await waitFor(() => expect(within(dialog).getByLabelText('From')).toHaveValue('Frankfurt am Main (FRA)'))
+    // the airports type themselves in, a letter at a time
+    await waitFor(() => expect(within(dialog).getByLabelText('From')).toHaveValue('Frankfurt am Main (FRA)'), {
+      timeout: 3000,
+    })
     expect(within(dialog).getByLabelText('To')).toHaveValue('Porto (OPO)')
     // Asked once the typing settled, not on every key.
     expect(fetch.mock.calls.filter(([url]) => url.includes('adsbdb'))).toHaveLength(1)

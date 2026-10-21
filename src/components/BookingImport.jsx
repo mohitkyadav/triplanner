@@ -14,6 +14,7 @@ import {
   IconPlaneTakeoff,
   Modal,
 } from './ui'
+import CategoryIcon from './CategoryIcon'
 
 // Reads a booking file, shows what it found, and adds only what the user ticks.
 // Nothing is saved until then.
@@ -94,8 +95,8 @@ export default function BookingImport({ trip, text, onImport, onClose }) {
                   >
                     {on ? <IconCheckCircle className="size-5" /> : <IconCircle className="size-5" />}
                   </span>
-                  <span className={`grid size-9 shrink-0 place-items-center rounded-lg text-lg ${cat.badge}`}>
-                    {cat.emoji}
+                  <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${cat.badge}`}>
+                    <CategoryIcon type={row.item.type} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{titleFor(row.item)}</span>

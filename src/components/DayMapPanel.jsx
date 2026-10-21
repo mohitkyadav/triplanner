@@ -27,6 +27,7 @@ import {
   IconXCircle,
   useDismiss,
 } from './ui'
+import CategoryIcon from './CategoryIcon'
 
 const DayMap = lazy(() => import('./DayMap'))
 
@@ -274,7 +275,9 @@ function PinCard({ trip, item, n, floating, onStatus, onEdit, onStep, onClose })
       }`}
     >
       <div className="flex items-start gap-3">
-        <span className={`grid size-10 shrink-0 place-items-center rounded-xl text-lg ${cat.badge}`}>{cat.emoji}</span>
+        <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${cat.badge}`}>
+          <CategoryIcon type={item.type} />
+        </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">
             <span className="text-slate-400">{n}.</span> {titleFor(item)}

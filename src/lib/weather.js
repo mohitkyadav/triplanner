@@ -17,16 +17,17 @@ const WINDOW_DAYS = 15
 /* ---------- WMO weather codes ---------- */
 
 export function weatherIcon(code) {
-  if (code === 0) return { emoji: '☀️', label: 'Clear' }
-  if (code <= 2) return { emoji: '🌤️', label: 'Partly cloudy' }
-  if (code === 3) return { emoji: '☁️', label: 'Overcast' }
-  if (code <= 48) return { emoji: '🌫️', label: 'Fog' }
-  if (code <= 57) return { emoji: '🌦️', label: 'Drizzle' }
-  if (code <= 67) return { emoji: '🌧️', label: 'Rain' }
-  if (code <= 77) return { emoji: '🌨️', label: 'Snow' }
-  if (code <= 82) return { emoji: '🌦️', label: 'Showers' }
-  if (code <= 86) return { emoji: '🌨️', label: 'Snow showers' }
-  return { emoji: '⛈️', label: 'Thunderstorm' }
+  // motion: the icon's gentle loop (index.css)
+  if (code === 0) return { emoji: '☀️', label: 'Clear', motion: 'wx-sun' }
+  if (code <= 2) return { emoji: '🌤️', label: 'Partly cloudy', motion: 'wx-cloud' }
+  if (code === 3) return { emoji: '☁️', label: 'Overcast', motion: 'wx-cloud' }
+  if (code <= 48) return { emoji: '🌫️', label: 'Fog', motion: 'wx-fog' }
+  if (code <= 57) return { emoji: '🌦️', label: 'Drizzle', motion: 'wx-rain' }
+  if (code <= 67) return { emoji: '🌧️', label: 'Rain', motion: 'wx-rain' }
+  if (code <= 77) return { emoji: '🌨️', label: 'Snow', motion: 'wx-snow' }
+  if (code <= 82) return { emoji: '🌦️', label: 'Showers', motion: 'wx-rain' }
+  if (code <= 86) return { emoji: '🌨️', label: 'Snow showers', motion: 'wx-snow' }
+  return { emoji: '⛈️', label: 'Thunderstorm', motion: 'wx-storm' }
 }
 
 /* ---------- cache ---------- */

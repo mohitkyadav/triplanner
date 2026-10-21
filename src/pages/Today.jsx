@@ -25,6 +25,7 @@ import {
   IconXCircle,
   iconBtn,
   PopIcon,
+  RollingText,
   Strike,
   useToast,
 } from '../components/ui'
@@ -37,6 +38,7 @@ import { reducedMotion, transition, vtName } from '../lib/motion'
 import { dayPlan, fmtClock, fmtDuration, fmtTimes, gapBetween, useClock } from '../lib/schedule'
 import { uid, useStore } from '../lib/store'
 import { useWeather } from '../lib/weather'
+import CategoryIcon from '../components/CategoryIcon'
 
 /* Trip mode: one day at a time, led by the plan to act on right now. The
    classic day list stays the place to build a trip; this view is for the days
@@ -52,7 +54,7 @@ function GapChip({ gap }) {
   if (!gap) return null
   if (gap.kind === 'clash') {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-bold text-rose-700 dark:bg-rose-400/10 dark:text-rose-300">
+      <span className="anim-shake inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-bold text-rose-700 dark:bg-rose-400/10 dark:text-rose-300">
         <IconAlert className="size-3" />
         {gap.minutes === 0 ? 'same time' : `overlaps ${fmtDuration(gap.minutes)}`}
       </span>
@@ -60,17 +62,21 @@ function GapChip({ gap }) {
   }
   if (gap.minutes === 0) return null
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+    <span className="anim-fade inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-slate-400 dark:text-slate-500">
       <IconHourglass className="size-3" />
       {fmtDuration(gap.minutes)} {gap.kind === 'free' ? 'free' : 'later'}
     </span>
   )
 }
 
-function Chip({ item, className = 'size-11 rounded-xl text-xl' }) {
+function Chip({ item, className = 'size-11 rounded-xl [&>svg]:size-5.5' }) {
   const cat = catById(item.type)
   const airline = item.type === 'flight' ? airlineFromFlightNo(item.flightNo) : null
-  const emoji = <span className={`grid shrink-0 place-items-center ${className} ${cat.badge}`}>{cat.emoji}</span>
+  const emoji = (
+    <span className={`grid shrink-0 place-items-center ${className} ${cat.badge}`}>
+      <CategoryIcon type={item.type} />
+    </span>
+  )
   return airline ? (
     <AirlineLogo iata={airline.iata} name={airline.name} className={className} fallback={emoji} />
   ) : (
@@ -138,7 +144,12 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
           <h2 className="text-xl font-bold leading-tight">{titleFor(item)}</h2>
           <p className="mt-1 text-sm font-semibold tabular-nums text-brand-600 dark:text-brand-300">
             {timeLabel(entry)}
-            {countdown && <span className="font-medium text-slate-500 dark:text-slate-400"> · {countdown}</span>}
+            {countdown && (
+              <span className="font-medium text-slate-500 dark:text-slate-400">
+                {' '}
+                · <RollingText text={countdown} />
+              </span>
+            )}
           </p>
           {left != null && (
             // the time left, draining as the plan runs
@@ -242,7 +253,7 @@ function PlanRow({ trip, entry, clash, muted, onEdit, onStatus }) {
             </span>
           )}
         </span>
-        <Chip item={item} className="size-8 rounded-lg text-sm" />
+        <Chip item={item} className="size-8 rounded-lg [&>svg]:size-4" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">
             <Strike on={skipped}>{titleFor(item)}</Strike>

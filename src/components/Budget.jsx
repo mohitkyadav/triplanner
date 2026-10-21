@@ -15,6 +15,7 @@ import {
   inputCls,
   Modal,
 } from './ui'
+import CategoryIcon from './CategoryIcon'
 
 /* The trip's money in one card: what is planned against the budget, what is
    paid, where it goes, and — with two or more travellers — who owes whom.
@@ -112,7 +113,8 @@ export default function BudgetCard({ trip }) {
                   <li key={type} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-medium">
-                        {cat.emoji} {cat.label}
+                        <CategoryIcon type={type} className="mr-1 inline size-3.5 align-[-2px]" />
+                        {cat.label}
                       </span>
                       <span className="tabular-nums text-slate-500 dark:text-slate-400">{fmtMoney(amount, cur)}</span>
                     </div>

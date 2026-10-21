@@ -17,6 +17,7 @@ import {
   btnPrimary,
   iconBtn,
   useToast,
+  RollingText,
 } from '../components/ui'
 import { fmtRange, todayISO } from '../lib/dates'
 import { downloadJSON, exportPayload, parseImport } from '../lib/io'
@@ -74,8 +75,8 @@ function TripRow({ trip, navigate, onDelete, introAt }) {
           )}
         </div>
         {when && (
-          <span className="mt-1 shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-400">
-            {when}
+          <span className="mt-1 shrink-0 overflow-hidden rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-400">
+            <RollingText text={when} stagger={25} />
           </span>
         )}
         <button
@@ -240,14 +241,14 @@ export default function Home({ navigate }) {
       <main className="mx-auto max-w-2xl px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-6">
         {state.trips.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-24 text-center">
-            <span className="text-6xl">🧳</span>
+            <span className="anim-bob text-6xl">🧳</span>
             <div>
               <h2 className="text-xl font-bold">Plan your first trip</h2>
               <p className="mt-1 max-w-xs text-sm text-slate-500 dark:text-slate-400">
                 Days, flights, hotels and places to see — all on your device, even offline.
               </p>
             </div>
-            <button className={btnPrimary} onClick={() => setCreating(true)}>
+            <button className={`${btnPrimary} anim-breathe`} onClick={() => setCreating(true)}>
               <IconPlus className="size-4" />
               New trip
             </button>

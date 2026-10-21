@@ -408,6 +408,29 @@ export function CountUp({ value, format = String, duration = 700 }) {
   return format(shown)
 }
 
+/* Text whose characters roll up into place when they change — a countdown
+   ticking from "in 46 min" to "in 45 min" rolls only the digit that moved.
+   Unchanged characters keep their element, so they stay still. */
+export function RollingText({ text, stagger = 0 }) {
+  const chars = [...String(text)]
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {chars.map((ch, i) => (
+          <span
+            key={`${i}:${ch}`}
+            className="anim-roll inline-block whitespace-pre"
+            style={stagger ? { animationDelay: `${i * stagger}ms` } : undefined}
+          >
+            {ch}
+          </span>
+        ))}
+      </span>
+    </>
+  )
+}
+
 /* Text that gets crossed out with a line drawn across it, left to right. */
 export function Strike({ on, children }) {
   return <span className={`strike ${on ? 'is-struck' : ''}`}>{children}</span>

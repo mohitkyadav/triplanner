@@ -10,7 +10,9 @@ export default function WeatherChip({ day, className = '' }) {
       className={`inline-flex shrink-0 items-center gap-1 text-xs font-semibold tabular-nums text-slate-500 dark:text-slate-400 ${className}`}
       title={`${icon.label}, ${day.max}° / ${day.min}°${rain}`}
     >
-      <span aria-hidden="true">{icon.emoji}</span>
+      <span aria-hidden="true" className={`inline-block ${icon.motion}`}>
+        {icon.emoji}
+      </span>
       <span>
         {day.max}°{/* the low only where there is room */}
         <span className="hidden font-medium text-slate-400 min-[400px]:inline dark:text-slate-500"> / {day.min}°</span>

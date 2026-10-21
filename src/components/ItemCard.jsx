@@ -21,6 +21,7 @@ import {
   Strike,
 } from './ui'
 import { vtName } from '../lib/motion'
+import CategoryIcon from './CategoryIcon'
 
 const STATUS_CYCLE = { undefined: 'done', done: 'skipped', skipped: undefined }
 const STATUS_UI = {
@@ -52,7 +53,9 @@ function Card({
 
   const airline = item.type === 'flight' ? airlineFromFlightNo(item.flightNo) : null
   const emojiBadge = (
-    <span className={`grid size-10 shrink-0 place-items-center rounded-xl text-lg ${cat.badge}`}>{cat.emoji}</span>
+    <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${cat.badge}`}>
+      <CategoryIcon type={item.type} />
+    </span>
   )
 
   let MetaIcon = null

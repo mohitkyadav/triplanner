@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { airlineFromFlightNo, callsign } from '../lib/airlines'
 import { CATEGORIES } from '../lib/categories'
 import { fmtDate } from '../lib/dates'
 import { useFlightRoute } from '../lib/flightRoute'
 import { coordsFromLink } from '../lib/geo'
 import { placeLinks } from '../lib/maps'
+import { reducedMotion } from '../lib/motion'
 import AirlineLogo from './AirlineLogo'
 import { DocumentList } from './Documents'
 import { PlaceSpot, PlaceSuggestions } from './PlacePicker'
@@ -25,6 +26,7 @@ import {
   Segmented,
   useToast,
 } from './ui'
+import CategoryIcon from './CategoryIcon'
 
 const NOTE_HINTS = {
   restaurant: 'What to eat, must-try dishes, reservation info…',
@@ -68,8 +70,27 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
   // The flight number whose usual route has been looked at.
   const [routeFor, setRouteFor] = useState(null)
   const [filled, setFilled] = useState(null) // the route the airports were filled from
-  const set = k => e =>
+  const [typing, setTyping] = useState(null) // the route being typed into From and To
+  const set = k => e => {
+    if (k === 'from' || k === 'to') setTyping(null) // a person typing takes over
     setF(prev => ({ ...prev, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
+  }
+
+  // A filled-in route types itself into From and To, a letter at a time.
+  useEffect(() => {
+    if (!typing) return
+    const longest = Math.max(typing.from.length, typing.to.length)
+    let n = 0
+    const timer = setInterval(() => {
+      n += 1
+      setF(prev => ({ ...prev, from: typing.from.slice(0, n), to: typing.to.slice(0, n) }))
+      if (n >= longest) {
+        clearInterval(timer)
+        setTyping(null)
+      }
+    }, 28)
+    return () => clearInterval(timer)
+  }, [typing])
 
   const travellers = trip?.travellers ?? []
 
@@ -132,7 +153,8 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
   if (route && code !== routeFor) {
     setRouteFor(code)
     const free = (!f.from.trim() && !f.to.trim()) || shows(filled)
-    if (free) setF(prev => ({ ...prev, from: route.from, to: route.to }))
+    if (free && reducedMotion()) setF(prev => ({ ...prev, from: route.from, to: route.to }))
+    else if (free) setTyping(route)
     setFilled(free ? route : null)
   }
   // What the map buttons will do, shown live under the field.
@@ -218,7 +240,10 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
                   : 'ring-1 ring-slate-200 hover:bg-slate-50 dark:ring-slate-700 dark:hover:bg-slate-800'
               }`}
             >
-              <span className="text-xl leading-none">{c.emoji}</span>
+              <CategoryIcon
+                type={c.id}
+                className={`size-6 transition-colors ${type === c.id ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 dark:text-slate-400'}`}
+              />
               <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{c.label}</span>
             </button>
           ))}
@@ -232,9 +257,10 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
             {airline && (
               <div className="-mt-2 flex items-center gap-2 text-[13px] font-medium text-slate-500 dark:text-slate-400">
                 <AirlineLogo
+                  key={airline.iata}
                   iata={airline.iata}
                   name={airline.name}
-                  className="size-6 rounded-md"
+                  className="anim-pop size-6 rounded-md"
                   fallback={<span className="text-base leading-none">✈️</span>}
                 />
                 {airline.name}
@@ -254,19 +280,20 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
                 <PickerInput type="time" value={f.endTime} onChange={set('endTime')} />
               </Field>
             </div>
-            {route && !shows(route) && (
+            {route && !typing && !shows(route) && (
               <button
                 type="button"
                 className={btnChip}
                 onClick={() => {
-                  setF(prev => ({ ...prev, from: route.from, to: route.to }))
+                  setTyping(reducedMotion() ? null : route)
+                  if (reducedMotion()) setF(prev => ({ ...prev, from: route.from, to: route.to }))
                   setFilled(route)
                 }}
               >
                 Use {route.from} → {route.to}
               </button>
             )}
-            {shows(filled) && (
+            {(typing || shows(filled)) && (
               <p className="-mt-2.5 text-[13px] text-slate-400 dark:text-slate-500">
                 Filled in from this flight’s usual route (adsbdb.com). Check it against your booking, and add the times
                 yourself.
