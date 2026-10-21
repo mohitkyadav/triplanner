@@ -222,9 +222,15 @@ export default function Home({ navigate }) {
             <IconQrCode className="size-4.5" />
           </button>
           {state.trips.length > 0 && (
-            <button className={btnPrimary} onClick={() => setCreating(true)}>
-              <IconPlus className="size-4" />
-              New trip
+            // just the plus on a phone, where the header has little room
+            <button
+              className={`${btnPrimary} max-sm:size-10 max-sm:p-0`}
+              onClick={() => setCreating(true)}
+              aria-label="New trip"
+              title="New trip"
+            >
+              <IconPlus className="size-4 max-sm:size-5" />
+              <span className="max-sm:hidden">New trip</span>
             </button>
           )}
           <AccountMenu />
