@@ -8,6 +8,7 @@ import { useStore } from '../lib/store'
 import { vtName } from '../lib/motion'
 import DayMapPanel, { mappable } from './DayMapPanel'
 import ItemCard from './ItemCard'
+import { daySummary, legBetween } from '../lib/timeline'
 import { IconBed, IconMap, IconPencil, IconPlus, IconRoute, IconTrash, iconBtn, Menu, Modal, useToast } from './ui'
 import WeatherChip from './WeatherChip'
 
@@ -44,6 +45,8 @@ export default function DayCard({
 
   const [mapOpen, setMapOpen] = useState(false)
   const cost = dayCost(trip, day)
+  // "3 stops · 09:50–13:30 · 6.4 km · €62"
+  const summary = [daySummary(day), cost > 0 && fmtMoney(cost, trip.currency)].filter(Boolean).join(' · ')
   const routeUrl = dayRouteUrl(trip, day)
 
   return (
@@ -52,7 +55,7 @@ export default function DayCard({
       style={{ viewTransitionName: vtName('day', day.id) }}
       className={`scroll-mt-18 transition-opacity duration-300 ${isPast ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''}`}
     >
-      <div className="mb-2.5 flex items-center gap-2 px-1">
+      <div className={`flex items-center gap-2 px-1 ${summary ? 'mb-0.5' : 'mb-2.5'}`}>
         <h2 className="shrink-0 whitespace-nowrap text-lg font-bold">Day {index + 1}</h2>
         {day.date && (
           <span className="shrink-0 whitespace-nowrap text-sm font-medium text-slate-500 dark:text-slate-400">
@@ -69,11 +72,6 @@ export default function DayCard({
         )}
         <span className="min-w-0 flex-1" />
         <WeatherChip day={weather} />
-        {cost > 0 && (
-          <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-400 dark:text-slate-500">
-            {fmtMoney(cost, trip.currency)}
-          </span>
-        )}
         {mappable(day).length > 0 && (
           <button
             className={iconBtn}
@@ -102,6 +100,9 @@ export default function DayCard({
           ]}
         />
       </div>
+      {summary && (
+        <p className="mb-2.5 px-1 text-xs font-medium tabular-nums text-slate-400 dark:text-slate-500">{summary}</p>
+      )}
 
       {stays.map(name => (
         <div
@@ -121,12 +122,15 @@ export default function DayCard({
       >
         <SortableContext items={day.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
           {day.items.length > 0 && (
-            <ul className="space-y-2">
-              {day.items.map(item => (
+            <ul>
+              {day.items.map((item, i) => (
                 <ItemCard
                   key={item.id}
                   trip={trip}
                   item={item}
+                  leg={i < day.items.length - 1 ? legBetween(item, day.items[i + 1]) : null}
+                  first={i === 0}
+                  last={i === day.items.length - 1}
                   onEdit={() => onEditItem(item)}
                   onSetStatus={status => setItemStatus(item.id, status)}
                   arrivals={arrivals}
@@ -139,7 +143,7 @@ export default function DayCard({
         <button
           onClick={onAddItem}
           style={{ viewTransitionName: vtName('add', day.id) }}
-          className={`${day.items.length > 0 ? 'mt-2 ' : ''}flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-300`}
+          className={`${day.items.length > 0 ? 'ml-24 mt-1 w-[calc(100%-6rem)] ' : 'w-full '}flex items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-800 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-300`}
         >
           <IconPlus className="size-4" />
           {day.items.length === 0 ? 'Plan this day — flight, hotel, places…' : 'Add more'}

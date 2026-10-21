@@ -79,7 +79,10 @@ describe('Triplanner', () => {
     expect(flight).toMatchObject({ type: 'flight', flightNo: 'LH 1178', time: '07:10', endTime: '09:45' })
     expect(flight).toMatchObject({ from: 'Berlin (BER)', to: 'Lisbon (LIS)' })
     expect(dinner.title).toBe('Dinner at Ramiro')
-    expect(screen.getByText('07:10–09:45')).toBeInTheDocument()
+    // on the timeline: leaves at 07:10, lands at 09:45
+    const row = screen.getByRole('button', { name: /Edit .*LH 1178/ }).closest('li')
+    expect(within(row).getByText('07:10')).toBeInTheDocument()
+    expect(within(row).getByText('09:45')).toBeInTheDocument()
   })
 
   it('keeps a shared copy next to your own trip instead of replacing it', async () => {

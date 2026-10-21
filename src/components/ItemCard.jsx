@@ -3,25 +3,35 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
 import { catById, flightRoute, titleFor } from '../lib/categories'
+import { placeLinks } from '../lib/maps'
 import { costCurrency, fmtMoney } from '../lib/money'
-import { fmtTimes } from '../lib/schedule'
+import { vtName } from '../lib/motion'
+import { fmtClock, fmtDuration, endOf, startOf } from '../lib/schedule'
+import { fmtKm } from '../lib/timeline'
 import AirlineLogo from './AirlineLogo'
-import MapLinks from './MapLinks'
+import CategoryIcon from './CategoryIcon'
 import {
+  IconAlert,
+  IconCheck,
   IconCheckCircle,
   IconCircle,
   IconGrip,
-  IconLogIn,
-  IconLogOut,
+  IconHourglass,
+  IconNavigation,
   IconPaperclip,
-  IconPlaneTakeoff,
   IconRadar,
   IconXCircle,
   PopIcon,
   Strike,
 } from './ui'
-import { vtName } from '../lib/motion'
-import CategoryIcon from './CategoryIcon'
+
+/* One plan on the day's timeline: its time on the left, a dot in its
+   category's colour on the line, and a slim card with what it is, where,
+   and what it costs. Under it, what lies before the next stop — free time
+   or an overlap, and how far it is.
+
+   Dragging: a long press anywhere on the card on a phone; the grip that
+   shows on hover with a mouse; the grip and arrow keys from a keyboard. */
 
 const STATUS_CYCLE = { undefined: 'done', done: 'skipped', skipped: undefined }
 const STATUS_UI = {
@@ -33,9 +43,49 @@ const STATUS_UI = {
     label: 'Planned — tap to mark done',
   },
 }
+
+// The address part of a picked place: "Red Fort, Netaji Subhash Marg, Delhi"
+// under "Red fort" reads "Netaji Subhash Marg, Delhi".
+function whereOf(item, title) {
+  const label = item.geo?.label
+  if (label) {
+    const [first, ...rest] = label.split(', ')
+    const same = first.toLowerCase().includes(title.toLowerCase()) || title.toLowerCase().includes(first.toLowerCase())
+    return same && rest.length ? rest.join(', ') : label
+  }
+  const place = String(item.place ?? '').trim()
+  return place && !/^https?:\/\//i.test(place) ? place : ''
+}
+
+function Leg({ leg }) {
+  const { gap, km } = leg
+  const parts = []
+  if (gap?.kind === 'clash') {
+    return (
+      <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400">
+        <IconAlert className="size-3" />
+        {gap.minutes === 0 ? 'same time' : `overlaps ${fmtDuration(gap.minutes)}`}
+        {km != null && <span className="text-slate-400 dark:text-slate-500">· {fmtKm(km)}</span>}
+      </span>
+    )
+  }
+  if (gap?.minutes > 0) parts.push(`${fmtDuration(gap.minutes)} ${gap.kind === 'free' ? 'free' : 'later'}`)
+  if (km != null) parts.push(fmtKm(km))
+  if (!parts.length) return null
+  return (
+    <span className="inline-flex items-center gap-1">
+      <IconHourglass className="size-3" />
+      {parts.join(' · ')}
+    </span>
+  )
+}
+
 function Card({
   trip,
   item,
+  leg,
+  first = true,
+  last = true,
   onEdit,
   onSetStatus,
   ghost,
@@ -43,6 +93,7 @@ function Card({
   arrived,
   dragRef,
   dragStyle,
+  rowProps,
   handleRef,
   handleProps,
 }) {
@@ -50,29 +101,38 @@ function Card({
   const title = titleFor(item)
   const status = STATUS_UI[item.status] ?? STATUS_UI.planned
   const skipped = item.status === 'skipped'
-
   const airline = item.type === 'flight' ? airlineFromFlightNo(item.flightNo) : null
-  const emojiBadge = (
-    <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${cat.badge}`}>
-      <CategoryIcon type={item.type} />
+  const tracker = item.type === 'flight' ? flightTrackerUrl(item.flightNo) : null
+  const links = item.type === 'flight' ? null : placeLinks(trip, item)
+  const directions = links && (links.kind === 'link' ? links.url : links.google)
+  const docs = item.attachments?.length ?? 0
+
+  const start = startOf(item)
+  const end = endOf(item)
+
+  // What it is beyond its name and icon, in one line.
+  const meta = []
+  if (item.type === 'flight') {
+    if (airline) meta.push(airline.name)
+    if (item.title && flightRoute(item)) meta.push(flightRoute(item))
+  } else {
+    if (item.type === 'hotel') meta.push(item.hotelAction === 'check-out' ? 'Check-out' : 'Check-in')
+    const where = whereOf(item, title)
+    if (where) meta.push(where)
+  }
+
+  const done = item.status === 'done'
+  // A done plan's dot turns into a green check.
+  const dot = done ? (
+    <span className="grid size-8 place-items-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400">
+      <IconCheck key="done" className="anim-pop size-4" />
+    </span>
+  ) : (
+    <span className={`grid size-8 place-items-center rounded-full ${cat.badge}`}>
+      <CategoryIcon type={item.type} className="size-4" />
     </span>
   )
 
-  let MetaIcon = null
-  let metaText = ''
-  if (item.type === 'flight') {
-    MetaIcon = IconPlaneTakeoff
-    // the title already shows the route when the plan has no label of its own
-    metaText = [airline?.name, item.title && flightRoute(item)].filter(Boolean).join(' · ')
-    if (!metaText) MetaIcon = null
-  } else if (item.type === 'hotel') {
-    MetaIcon = item.hotelAction === 'check-out' ? IconLogOut : IconLogIn
-    metaText = item.hotelAction === 'check-out' ? 'Check-out' : 'Check-in'
-  }
-
-  const times = fmtTimes(item)
-  const tracker = item.type === 'flight' ? flightTrackerUrl(item.flightNo) : null
-  const docs = item.attachments?.length ?? 0
   // The card opens with Enter or Space too; keys pressed on the buttons and
   // links inside it stay theirs.
   const onKeyDown = e => {
@@ -84,123 +144,169 @@ function Card({
   return (
     <li
       ref={dragRef}
+      {...rowProps}
       style={
         overlay ? dragStyle : { ...dragStyle, viewTransitionName: vtName('plan', item.id), viewTransitionClass: 'plan' }
       }
-      className={`card-focus relative flex items-start gap-2 rounded-xl bg-white p-3 ring-1 dark:bg-slate-900 ${
-        ghost
-          ? 'opacity-40 shadow-sm ring-slate-200 dark:ring-slate-800'
-          : overlay
+      className={`group/plan grid select-none grid-cols-[2.75rem_2rem_minmax(0,1fr)] gap-x-2.5 [-webkit-touch-callout:none] [touch-action:manipulation] ${
+        ghost ? 'opacity-40' : ''
+      } ${skipped ? 'opacity-60' : ''}`}
+    >
+      {/* the time, on the left of the line */}
+      <span className="row-start-1 pt-2.5 text-right tabular-nums leading-tight">
+        {start != null && (
+          <span className="block text-[13px] font-semibold text-slate-700 dark:text-slate-200">{fmtClock(start)}</span>
+        )}
+        {end != null && end !== start && (
+          <span className="block text-[11px] text-slate-400 dark:text-slate-500">{fmtClock(end % 1440)}</span>
+        )}
+      </span>
+
+      {/* the line, with this plan's dot on it */}
+      <span className="relative row-span-2 flex justify-center">
+        {!overlay && (
+          <span
+            aria-hidden="true"
+            className="absolute left-1/2 w-0.5 -translate-x-1/2 rounded-full bg-slate-200 dark:bg-slate-800"
+            style={{ top: first ? '1.5rem' : 0, bottom: last ? 'calc(100% - 1.5rem)' : 0 }}
+          />
+        )}
+        <span className="relative mt-1.5 rounded-full ring-4 ring-slate-50 dark:ring-slate-950">
+          {airline && !done ? (
+            <AirlineLogo iata={airline.iata} name={airline.name} className="size-8 rounded-full" fallback={dot} />
+          ) : (
+            dot
+          )}
+        </span>
+      </span>
+
+      {/* the card */}
+      <div
+        className={`card-focus col-start-3 row-start-1 flex min-w-0 items-start gap-1 rounded-xl bg-white py-2 pl-3 pr-1.5 ring-1 dark:bg-slate-900 ${
+          overlay
             ? 'anim-lift shadow-2xl ring-brand-400 dark:ring-brand-500'
             : 'shadow-sm ring-slate-200 dark:ring-slate-800'
-      } ${arrived ? 'anim-arrive' : ''}`}
-    >
-      <button
-        ref={handleRef}
-        {...handleProps}
-        className="-m-1 mt-1.5 shrink-0 cursor-grab touch-none rounded p-1 text-slate-300 transition hover:text-slate-500 active:cursor-grabbing dark:text-slate-600 dark:hover:text-slate-400"
-        aria-label="Reorder"
+        } ${arrived ? 'anim-arrive' : ''}`}
       >
-        <IconGrip className="size-4" />
-      </button>
-
-      <div
-        className={`card-hit flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg transition-opacity duration-300 ${skipped ? 'opacity-50' : ''}`}
-        onClick={onEdit}
-        onKeyDown={onKeyDown}
-        role="button"
-        tabIndex={overlay ? -1 : 0}
-        aria-label={`Edit ${title}`}
-      >
-        {airline ? (
-          <AirlineLogo iata={airline.iata} name={airline.name} className="size-10 rounded-xl" fallback={emojiBadge} />
-        ) : (
-          emojiBadge
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate font-medium">
-              <Strike on={skipped}>{title}</Strike>
+        <div
+          className="card-hit min-w-0 flex-1 cursor-pointer rounded-lg py-0.5"
+          onClick={onEdit}
+          onKeyDown={onKeyDown}
+          role="button"
+          tabIndex={overlay ? -1 : 0}
+          aria-label={`Edit ${title}`}
+        >
+          <span className="block truncate font-medium">
+            <Strike on={skipped}>{title}</Strike>
+          </span>
+          {(meta.length > 0 || Number.isFinite(item.cost) || docs > 0 || tracker || directions) && (
+            <span className="mt-0.5 flex min-w-0 items-center gap-x-1.5 text-xs text-slate-500 dark:text-slate-400">
+              {meta.length > 0 && <span className="min-w-0 truncate">{meta.join(' · ')}</span>}
+              {Number.isFinite(item.cost) && (
+                <span className="shrink-0 font-semibold tabular-nums text-slate-600 dark:text-slate-300">
+                  {meta.length > 0 && <span className="mr-1.5 font-normal text-slate-300 dark:text-slate-600">·</span>}
+                  {fmtMoney(item.cost, costCurrency(trip, item))}
+                  {item.paid && <span className="ml-1 font-medium text-emerald-600 dark:text-emerald-400">paid</span>}
+                </span>
+              )}
+              {docs > 0 && (
+                <span
+                  className="inline-flex shrink-0 items-center gap-0.5"
+                  title={`${docs} document${docs === 1 ? '' : 's'}`}
+                >
+                  <IconPaperclip className="size-3.5" />
+                  {docs}
+                </span>
+              )}
+              {tracker && (
+                <a
+                  href={tracker}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="inline-flex shrink-0 items-center gap-1 font-semibold text-brand-600 hover:underline dark:text-brand-300"
+                >
+                  <IconRadar className="size-3.5" />
+                  Track
+                </a>
+              )}
             </span>
-            {times && (
-              <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                {times}
-              </span>
-            )}
-            <button
-              onClick={e => {
-                e.stopPropagation()
-                onSetStatus?.(STATUS_CYCLE[item.status])
-              }}
-              className={`-my-1 -mr-1.5 shrink-0 rounded-full p-1 transition ${status.cls}`}
-              aria-label={status.label}
-              title={status.label}
-            >
-              <PopIcon icon={status.icon} state={item.status} className="size-5.5" />
-            </button>
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-            <span className={`rounded-md px-1.5 py-0.5 font-medium ${cat.badge}`}>{cat.label}</span>
-            {metaText && (
-              <span className="inline-flex items-center gap-1">
-                <MetaIcon className="size-3.5" />
-                {metaText}
-              </span>
-            )}
-            {Number.isFinite(item.cost) && (
-              <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">
-                {fmtMoney(item.cost, costCurrency(trip, item))}
-                {item.paid && <span className="ml-1 font-medium text-emerald-600 dark:text-emerald-400">paid</span>}
-              </span>
-            )}
-            {docs > 0 && (
-              <span className="inline-flex items-center gap-0.5" title={`${docs} document${docs === 1 ? '' : 's'}`}>
-                <IconPaperclip className="size-3.5" />
-                {docs}
-              </span>
-            )}
-            {tracker && (
-              <a
-                href={tracker}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline dark:text-brand-300"
-              >
-                <IconRadar className="size-3.5" />
-                Track
-              </a>
-            )}
-            <MapLinks trip={trip} item={item} />
-          </div>
+          )}
           {item.notes && (
-            <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-sm text-slate-500 dark:text-slate-400">
-              {item.notes}
-            </p>
+            <span className="mt-1 line-clamp-1 text-[13px] text-slate-500 dark:text-slate-400">{item.notes}</span>
           )}
         </div>
+
+        {directions && (
+          <a
+            href={directions}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="shrink-0 rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-brand-300"
+            aria-label={`Directions to ${title}`}
+            title="Directions"
+          >
+            <IconNavigation className="size-4" />
+          </a>
+        )}
+        <button
+          onClick={e => {
+            e.stopPropagation()
+            onSetStatus?.(STATUS_CYCLE[item.status])
+          }}
+          className={`shrink-0 rounded-full p-1 transition ${status.cls}`}
+          aria-label={status.label}
+          title={status.label}
+        >
+          <PopIcon icon={status.icon} state={item.status} className="size-5.5" />
+        </button>
+        {/* with a mouse the grip shows on hover; on a phone, long-press the card */}
+        <button
+          ref={handleRef}
+          {...handleProps}
+          className="-ml-0.5 mt-1 shrink-0 cursor-grab rounded p-0.5 text-slate-300 opacity-0 transition group-hover/plan:opacity-100 focus-visible:opacity-100 active:cursor-grabbing pointer-coarse:hidden dark:text-slate-600"
+          aria-label="Reorder"
+        >
+          <IconGrip className="size-4" />
+        </button>
       </div>
+
+      {/* what lies before the next stop */}
+      {!last && leg && (
+        <span className="col-start-3 row-start-2 flex items-center px-3 py-1.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+          <Leg leg={leg} />
+        </span>
+      )}
+      {!last && !leg && <span className="col-start-3 row-start-2 h-2" />}
     </li>
   )
 }
 
-export default function ItemCard({ trip, item, onEdit, onSetStatus, arrivals }) {
+export default function ItemCard({ trip, item, leg, first, last, onEdit, onSetStatus, arrivals }) {
   const [arrived] = useState(() => Boolean(arrivals?.current))
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
   })
+  // A long press anywhere on the row drags on touch; the grip does with a
+  // mouse and from the keyboard.
+  const { onTouchStart, ...handleListeners } = listeners ?? {}
   return (
     <Card
       trip={trip}
       item={item}
+      leg={leg}
+      first={first}
+      last={last}
       onEdit={onEdit}
       onSetStatus={onSetStatus}
       arrived={arrived}
       ghost={isDragging}
       dragRef={setNodeRef}
       dragStyle={{ transform: CSS.Transform.toString(transform), transition }}
+      rowProps={{ onTouchStart }}
       handleRef={setActivatorNodeRef}
-      handleProps={{ ...attributes, ...listeners }}
+      handleProps={{ ...attributes, ...handleListeners }}
     />
   )
 }
