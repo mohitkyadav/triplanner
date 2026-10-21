@@ -86,11 +86,30 @@ export const DAY_COLORS = ['#0ea5e9', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'
 
    runningId: the plan under way now (Trip mode), drawn pulsing.
    onStatus(item, status, dayId), onEdit(item, dayId). */
-export default function DayMapPanel({ trip, days, runningId, routeUrl, onStatus, onEdit, className = 'h-64' }) {
+/* For Trip mode's map mode: `bare` fills its box edge to edge with no
+   card, credits list or route link; `selectedId`/`onSelect` share the
+   picked pin with a list beside the map; `onExpand` replaces the full
+   screen button's action; `focusOffset` keeps picked pins clear of a sheet. */
+export default function DayMapPanel({
+  trip,
+  days,
+  runningId,
+  routeUrl,
+  onStatus,
+  onEdit,
+  className = 'h-64',
+  bare = false,
+  selectedId: sharedSelected,
+  onSelect: onSharedSelect,
+  onExpand,
+  focusOffset,
+}) {
   const [on] = useOnlineEnabled()
   const center = useDestinationCenter(trip.destination)
   const [styleId, setStyleId] = useMapStyle()
-  const [selectedId, setSelectedId] = useState(null)
+  const [ownSelected, setOwnSelected] = useState(null)
+  const selectedId = sharedSelected !== undefined ? sharedSelected : ownSelected
+  const setSelectedId = onSharedSelect ?? setOwnSelected
   const [full, setFull] = useState(false)
   const [inlineHost, setInlineHost] = useState(null)
   const [fullHost, setFullHost] = useState(null)
@@ -152,10 +171,17 @@ export default function DayMapPanel({ trip, days, runningId, routeUrl, onStatus,
       onClose={() => setSelectedId(null)}
     />
   )
-  const chrome = <MapButtons styleId={styleId} onStyle={setStyleId} full={full} onFull={() => setFull(f => !f)} />
+  const chrome = (
+    <MapButtons
+      styleId={styleId}
+      onStyle={setStyleId}
+      full={full || bare}
+      onFull={onExpand ?? (() => setFull(f => !f))}
+    />
+  )
 
   return (
-    <div className="space-y-2">
+    <div className={bare ? 'h-full' : 'space-y-2'}>
       {several && (
         <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
           {[
@@ -187,7 +213,9 @@ export default function DayMapPanel({ trip, days, runningId, routeUrl, onStatus,
         </div>
       )}
       <div
-        className={`relative isolate overflow-hidden rounded-2xl bg-slate-100 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800 ${className}`}
+        className={`relative isolate overflow-hidden bg-slate-100 dark:bg-slate-900 ${
+          bare ? 'h-full' : `rounded-2xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 ${className}`
+        }`}
       >
         <div ref={setInlineHost} className="absolute inset-0" />
         <Suspense
@@ -204,7 +232,7 @@ export default function DayMapPanel({ trip, days, runningId, routeUrl, onStatus,
             onSelect={setSelectedId}
             styleId={styleId}
             host={full ? fullHost : inlineHost}
-            focusOffset={full && selected ? 110 : 0}
+            focusOffset={focusOffset ?? (full && selected ? 110 : 0)}
           />
         </Suspense>
         {full ? (
@@ -215,14 +243,14 @@ export default function DayMapPanel({ trip, days, runningId, routeUrl, onStatus,
           chrome
         )}
       </div>
-      {!full && card}
-      {routeUrl && (
+      {!full && !bare && card}
+      {routeUrl && !bare && (
         <a className={btnChip} href={routeUrl} target="_blank" rel="noopener noreferrer">
           <IconRoute className="size-3.5" />
           The day&apos;s route in Google Maps
         </a>
       )}
-      {missing > 0 && (
+      {missing > 0 && !bare && (
         <p className="px-1 text-[12px] text-slate-400 dark:text-slate-500">
           {missing === 1 ? '1 plan is' : `${missing} plans are`} not on the map yet. Open a plan to pick its place.
         </p>

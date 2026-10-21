@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import AirlineLogo from '../components/AirlineLogo'
-import { DocumentChips } from '../components/Documents'
+import { DocumentChips, DocumentViewer } from '../components/Documents'
 import DayMapPanel, { mappable } from '../components/DayMapPanel'
+import { PlanRow } from '../components/ItemCard'
 import ItemForm from '../components/ItemForm'
 import MapLinks from '../components/MapLinks'
 import WeatherChip from '../components/WeatherChip'
@@ -9,12 +11,13 @@ import {
   btnChip,
   btnChipBrand,
   btnPrimary,
+  Collapse,
   IconAlert,
   IconArrowLeft,
   IconCheckCircle,
+  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
-  IconCircle,
   IconHourglass,
   IconMap,
   IconNavigation,
@@ -22,22 +25,23 @@ import {
   IconPlus,
   IconRadar,
   IconRoute,
+  IconTicket,
   IconXCircle,
   iconBtn,
-  PopIcon,
   RollingText,
-  Strike,
+  useDismiss,
   useToast,
 } from '../components/ui'
 import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
-import { catById, flightRoute, titleFor } from '../lib/categories'
+import { airportCity, catById, titleFor } from '../lib/categories'
 import { deviceTimeZone, fmtDate } from '../lib/dates'
 import { dayRouteUrl, pairRouteUrl } from '../lib/maps'
 import { costCurrency, dayCost, fmtMoney } from '../lib/money'
 import { reducedMotion, transition, vtName } from '../lib/motion'
 import { dayPlan, fmtClock, fmtDuration, fmtTimes, gapBetween, useClock } from '../lib/schedule'
 import { uid, useStore } from '../lib/store'
-import { useWeather } from '../lib/weather'
+import { rainAhead, useWeather, useWeatherNow, weatherIcon } from '../lib/weather'
+import { legBetween } from '../lib/timeline'
 import CategoryIcon from '../components/CategoryIcon'
 
 /* Trip mode: one day at a time, led by the plan to act on right now. The
@@ -99,9 +103,21 @@ function countdownFor(entry, running, now) {
 // down into "Done and skipped" and the next plan up into its place.
 const planName = item => ({ viewTransitionName: vtName('now', item.id), viewTransitionClass: 'plan' })
 
+// The label for the lead card's document button, from the file's name.
+function ticketLabel(doc) {
+  if (/board/i.test(doc.name)) return 'Boarding pass'
+  if (/ticket|pass|entry|voucher/i.test(doc.name)) return 'Show ticket'
+  return 'Open document'
+}
+
 function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
   const { item } = entry
-  const cat = catById(item.type)
+  const [viewing, setViewing] = useState(null) // the document open full screen
+  const ticket = item.attachments?.[0] ?? null
+  const cities =
+    item.type === 'flight' && airportCity(item.from) && airportCity(item.to)
+      ? `${airportCity(item.from)} → ${airportCity(item.to)}`
+      : ''
   const countdown = countdownFor(entry, running, now)
   const left =
     running && now != null && entry.end != null && entry.end > entry.start
@@ -160,21 +176,39 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
               />
             </span>
           )}
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-            <span className={`rounded-md px-1.5 py-0.5 font-medium ${cat.badge}`}>{cat.label}</span>
-            {item.type === 'flight' && item.title && flightRoute(item) && <span>{flightRoute(item)}</span>}
-            {Number.isFinite(item.cost) && (
-              <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">
-                {fmtMoney(item.cost, costCurrency(trip, item))}
-              </span>
-            )}
-          </div>
+          {(cities || Number.isFinite(item.cost)) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+              {cities && <span>{cities}</span>}
+              {Number.isFinite(item.cost) && (
+                <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">
+                  {fmtMoney(item.cost, costCurrency(trip, item))}
+                </span>
+              )}
+            </div>
+          )}
           {item.notes && (
             <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">{item.notes}</p>
           )}
           <DocumentChips docs={item.attachments} className="mt-2.5" />
         </div>
       </div>
+
+      {/* the ticket, one tap away at the gate or the door */}
+      {ticket && (
+        <div className="px-4 pb-3">
+          <button
+            onClick={() => setViewing(ticket)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-brand shadow-sm transition hover:brightness-105 active:scale-[.99]"
+          >
+            <IconTicket className="size-4.5" />
+            {ticketLabel(ticket)}
+            {item.attachments.length > 1 && (
+              <span className="font-semibold opacity-70">+{item.attachments.length - 1}</span>
+            )}
+          </button>
+        </div>
+      )}
+      {viewing && <DocumentViewer doc={viewing} onClose={() => setViewing(null)} />}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
         <button className={btnChipBrand} onClick={() => onStatus('done')}>
@@ -228,75 +262,134 @@ function Hop({ trip, from, to }) {
   )
 }
 
-/* ---------- compact rows for the rest of the day ---------- */
+/* ---------- the rest of the day ---------- */
 
-function PlanRow({ trip, entry, clash, muted, onEdit, onStatus }) {
-  const { item } = entry
-  const skipped = item.status === 'skipped'
-  const done = item.status === 'done'
-  const StatusIcon = done ? IconCheckCircle : skipped ? IconXCircle : IconCircle
-
+// Plans in a row on the day's line (the trip page's look), with what lies
+// between one and the next. `vtPrefix` 'now' lets a row and the lead card
+// morph into each other when a plan is marked.
+function Timeline({ trip, entries, muted, selectedId, onTap, onStatus }) {
   return (
-    <li
-      className="card-focus flex items-center gap-2.5 rounded-xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
-      style={planName(item)}
-    >
-      <button
-        onClick={onEdit}
-        className={`card-hit flex min-w-0 flex-1 items-center gap-2.5 text-left ${muted ? 'opacity-55' : ''}`}
-      >
-        <span className="w-11 shrink-0 text-center text-xs font-bold tabular-nums text-slate-500 dark:text-slate-400">
-          {entry.start == null ? '—' : fmtClock(entry.start)}
-          {entry.end != null && (
-            <span className="block text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-              {fmtClock(entry.end)}
-            </span>
-          )}
-        </span>
-        <Chip item={item} className="size-8 rounded-lg [&>svg]:size-4" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">
-            <Strike on={skipped}>{titleFor(item)}</Strike>
-          </span>
-          <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            <span>{catById(item.type).label}</span>
-            {Number.isFinite(item.cost) && <span>{fmtMoney(item.cost, costCurrency(trip, item))}</span>}
-            {item.attachments?.length > 0 && <span>📎 {item.attachments.length}</span>}
-            {clash && (
-              <span className="inline-flex items-center gap-0.5 font-bold text-rose-600 dark:text-rose-400">
-                <IconAlert className="size-3" />
-                {clash.minutes === 0 ? 'same time' : 'overlaps'}
-              </span>
-            )}
-          </span>
-        </span>
-      </button>
-      <button
-        onClick={onStatus}
-        className={`shrink-0 rounded-full p-1 transition ${
-          done
-            ? 'text-emerald-500 hover:text-emerald-600'
-            : skipped
-              ? 'text-slate-400 hover:text-slate-500'
-              : 'text-slate-300 hover:text-slate-400 dark:text-slate-600 dark:hover:text-slate-500'
-        }`}
-        aria-label={`Change the result of ${titleFor(item)}`}
-      >
-        <PopIcon icon={StatusIcon} state={item.status} className="size-5.5" />
-      </button>
-    </li>
+    <ul>
+      {entries.map((entry, i) => (
+        <PlanRow
+          key={entry.item.id}
+          trip={trip}
+          item={entry.item}
+          leg={i < entries.length - 1 ? legBetween(entry.item, entries[i + 1].item) : null}
+          first={i === 0}
+          last={i === entries.length - 1}
+          vtPrefix="now"
+          muted={muted}
+          selected={entry.item.id === selectedId}
+          onEdit={() => onTap(entry.item)}
+          onSetStatus={status => onStatus(entry.item, status)}
+        />
+      ))}
+    </ul>
   )
 }
 
-function Section({ title, count, children }) {
+function Heading({ children }) {
+  return (
+    <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+      {children}
+    </h3>
+  )
+}
+
+// What is done or skipped, folded into one line until asked for.
+function DoneFold({ count, children }) {
+  const [open, setOpen] = useState(false)
   return (
     <section>
-      <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-        {title}
-        {count != null && <span className="ml-1.5 font-semibold normal-case tracking-normal">({count})</span>}
-      </h3>
-      <ul className="space-y-2">{children}</ul>
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1.5 rounded-xl px-1 py-1.5 text-left text-[13px] font-semibold text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900"
+      >
+        <IconCheckCircle className="size-4 text-emerald-500" />
+        {count} done or skipped
+        <span className="flex-1" />
+        <IconChevronDown className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <Collapse open={open}>
+        <div className="pt-2">{children}</div>
+      </Collapse>
     </section>
+  )
+}
+
+/* Map mode: the day's map over the whole screen, and its plans in a sheet
+   pulled up from the bottom — a peek, half the screen, or most of it. A pin
+   picked on the map lights its row in the sheet, a row tapped once shows
+   its pin, and a second tap opens it. Back or the shrink button leave. */
+const SHEET = [0.2, 0.46, 0.86] // of the screen's height
+
+function MapMode({ title, onClose, map, children }) {
+  useDismiss(onClose)
+  const [snap, setSnap] = useState(1)
+  const [dragged, setDragged] = useState(null) // the sheet's height while a finger moves it
+  const drag = useRef(null)
+  const height = snap => Math.round(window.innerHeight * SHEET[snap])
+  const shown = dragged ?? height(snap)
+
+  const handle = {
+    onPointerDown: e => {
+      if (e.target.closest('button')) return
+      drag.current = { y: e.clientY, h: shown, t: e.timeStamp, v: 0, last: e.clientY }
+      e.currentTarget.setPointerCapture(e.pointerId)
+    },
+    onPointerMove: e => {
+      const d = drag.current
+      if (!d) return
+      d.v = (d.last - e.clientY) / Math.max(1, e.timeStamp - d.t)
+      d.last = e.clientY
+      d.t = e.timeStamp
+      setDragged(Math.max(96, Math.min(window.innerHeight * 0.92, d.h + d.y - e.clientY)))
+    },
+    onPointerUp: () => {
+      const d = drag.current
+      drag.current = null
+      if (!d) return
+      // a flick goes to the next stop its way; otherwise the nearest stop wins
+      const h = dragged ?? d.h
+      const stops = SHEET.map((_, n) => n)
+      let next = stops.reduce((a, b) => (Math.abs(height(b) - h) < Math.abs(height(a) - h) ? b : a))
+      if (d.v > 0.4) next = stops.find(n => height(n) > h + 8) ?? 2
+      if (d.v < -0.4) next = stops.filter(n => height(n) < h - 8).pop() ?? 0
+      setSnap(next)
+      setDragged(null)
+    },
+  }
+  handle.onPointerCancel = handle.onPointerUp
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 bg-slate-100 dark:bg-slate-900" role="region" aria-label="Map mode">
+      <div className="absolute inset-0">{map(Math.round(shown / 2))}</div>
+      <div
+        data-sheet
+        className="absolute inset-x-0 bottom-0 z-10 mx-auto flex max-w-2xl flex-col rounded-t-3xl bg-slate-50 shadow-[0_-8px_30px_rgba(0,0,0,0.18)] ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-800"
+        style={{ height: shown, transition: dragged == null ? 'height .32s cubic-bezier(.2,.8,.2,1)' : 'none' }}
+      >
+        <div {...handle} className="shrink-0 cursor-grab touch-none px-4 pb-2 pt-2 active:cursor-grabbing">
+          <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-700" />
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm font-bold">{title}</span>
+            <button
+              className={iconBtn}
+              onClick={() => setSnap(snap === 2 ? 0 : 2)}
+              aria-label={snap === 2 ? 'Lower the list' : 'Raise the list'}
+            >
+              <IconChevronDown className={`size-4.5 transition-transform ${snap === 2 ? '' : 'rotate-180'}`} />
+            </button>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          {children({ raise: () => snap === 0 && setSnap(1) })}
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -322,10 +415,17 @@ export default function Today({ id, navigate }) {
   const { minutes, today } = useClock(trip?.timeZone)
   const days = useMemo(() => trip?.days ?? [], [trip])
   const weather = useWeather(trip)
+  // the weather now and soon, while the trip is on today
+  const weatherNow = useWeatherNow(
+    trip,
+    days.some(d => d.date === today),
+  )
 
   const [pickedIndex, setPickedIndex] = useState(null) // null follows the clock
   const [itemModal, setItemModal] = useState(null) // { dayId, item? }
   const [showMap, setShowMap] = useState(readMapPref)
+  const [mapMode, setMapMode] = useState(false)
+  const [selectedId, setSelectedId] = useState(null) // the plan picked on the map in map mode
   const swipe = useRef(null)
 
   // The day the trip is on: today, else the next day of the trip, else the last.
@@ -365,14 +465,6 @@ export default function Today({ id, navigate }) {
   // The trip's clock, shown when it is not the one on this device.
   const zoneClock = trip.timeZone && trip.timeZone !== deviceTimeZone() ? fmtClock(minutes) : null
   const routeUrl = dayRouteUrl(trip, day)
-
-  // What the view shows in order, so a clash is marked where it is seen.
-  const sequence = [plan.hero, plan.then, ...plan.later].filter(Boolean)
-  const clashing = new Map()
-  sequence.forEach((entry, i) => {
-    const gap = gapBetween(sequence[i - 1], entry)
-    if (gap?.kind === 'clash') clashing.set(entry, gap)
-  })
 
   // Moves to another day: the old day slides out, the new one in from the
   // side it lies on.
@@ -441,12 +533,102 @@ export default function Today({ id, navigate }) {
     })
   }
 
-  const rowProps = entry => ({
-    trip,
-    entry,
-    onEdit: () => setItemModal({ dayId: day.id, item: entry.item }),
-    onStatus: () => setStatus(entry.item, STATUS_NEXT[entry.item.status]),
-  })
+  const runningId = plan.running ? plan.hero.item.id : null
+  const rest = [plan.then, ...plan.later].filter(Boolean)
+  const progress = plan.openCount ? (plan.doneCount / plan.openCount) * 100 : 0
+  const nowWx = isToday && weatherNow ? weatherIcon(weatherNow.code) : null
+  const rain = isToday ? rainAhead(weatherNow) : ''
+
+  // A row tapped in map mode shows its pin first; tapped again, it opens.
+  const tapRow = inSheet => item => {
+    if (inSheet && selectedId !== item.id) return setSelectedId(item.id)
+    setItemModal({ dayId: day.id, item })
+  }
+
+  // The day's plans: the one to act on, then the rest on the line, then
+  // those waiting for a result, then — folded — the ones done or skipped.
+  const dayList = inSheet => (
+    <>
+      {plan.total === 0 && (
+        <div className="rounded-2xl border-2 border-dashed border-slate-300 px-4 py-10 text-center dark:border-slate-700">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Nothing is planned for this day.</p>
+          <button className={`${btnPrimary} mt-3`} onClick={() => setItemModal({ dayId: day.id })}>
+            <IconPlus className="size-4" />
+            Add a plan
+          </button>
+        </div>
+      )}
+
+      {plan.hero && (
+        <div>
+          <HeroCard
+            trip={trip}
+            entry={plan.hero}
+            label={plan.running ? 'Now' : isToday ? 'Next up' : 'First up'}
+            running={plan.running}
+            now={isToday ? minutes : null}
+            onEdit={() => setItemModal({ dayId: day.id, item: plan.hero.item })}
+            onStatus={status => setStatus(plan.hero.item, status)}
+          />
+          {plan.then && <Hop trip={trip} from={plan.hero} to={plan.then} />}
+        </div>
+      )}
+
+      {!plan.hero && plan.total > 0 && (
+        <div className="rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+          <p className="text-3xl">{plan.missed.length > 0 ? '🌙' : '🎉'}</p>
+          <p className="mt-2 text-sm font-semibold">
+            {isToday ? 'Nothing more is planned today' : 'Every plan of this day is marked'}
+          </p>
+          <p className="mt-0.5 text-[13px] text-slate-500 dark:text-slate-400">
+            {plan.missed.length > 0
+              ? 'Some plans have no result yet. Mark them below.'
+              : 'Every plan of this day carries a result.'}
+          </p>
+        </div>
+      )}
+
+      {rest.length > 0 && (
+        <section>
+          <Heading>{plan.hero ? (isToday ? 'Later today' : 'Then') : 'Also this day'}</Heading>
+          <Timeline
+            trip={trip}
+            entries={rest}
+            selectedId={inSheet ? selectedId : null}
+            onTap={tapRow(inSheet)}
+            onStatus={setStatus}
+          />
+        </section>
+      )}
+
+      {plan.missed.length > 0 && (
+        <section>
+          <Heading>Not marked yet</Heading>
+          <Timeline
+            trip={trip}
+            entries={plan.missed}
+            muted
+            selectedId={inSheet ? selectedId : null}
+            onTap={tapRow(inSheet)}
+            onStatus={setStatus}
+          />
+        </section>
+      )}
+
+      {plan.done.length > 0 && (
+        <DoneFold count={plan.done.length}>
+          <Timeline
+            trip={trip}
+            entries={plan.done}
+            muted
+            selectedId={inSheet ? selectedId : null}
+            onTap={tapRow(inSheet)}
+            onStatus={setStatus}
+          />
+        </DoneFold>
+      )}
+    </>
+  )
 
   return (
     <div className="min-h-dvh">
@@ -502,127 +684,110 @@ export default function Today({ id, navigate }) {
             <IconChevronRight className="size-4.5" />
           </button>
         </div>
+        {/* how much of the day is done, along the bar's bottom edge */}
+        {plan.openCount > 0 && (
+          <div
+            className="absolute inset-x-0 -bottom-px h-[3px]"
+            role="progressbar"
+            aria-label={`${plan.doneCount} of ${plan.openCount} done`}
+            aria-valuenow={Math.round(progress)}
+          >
+            <div
+              className="h-full rounded-r-full bg-emerald-500 transition-[width] duration-700"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
       </div>
 
       <main
-        className="mx-auto max-w-2xl space-y-5 px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-4"
+        className="mx-auto max-w-2xl space-y-5 px-4 pb-[max(7rem,env(safe-area-inset-bottom))] pt-3"
         style={{ viewTransitionName: 'today-day' }}
         data-vt-shared
         {...swipeHandlers}
       >
-        {day.title && <p className="px-1 text-sm font-medium text-slate-500 dark:text-slate-400">{day.title}</p>}
+        {/* the day in a line: its name, the weather now and soon, how far along */}
+        <div className="space-y-0.5 px-1 text-[13px]">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate font-medium text-slate-500 dark:text-slate-400">{day.title}</span>
+            {plan.openCount > 0 && (
+              <span className="shrink-0 font-semibold tabular-nums text-slate-500 dark:text-slate-400">
+                <span key={plan.doneCount} className="anim-tick inline-block">
+                  {plan.doneCount}
+                </span>{' '}
+                of {plan.openCount} done{cost > 0 && <> · {fmtMoney(cost, trip.currency)}</>}
+              </span>
+            )}
+          </div>
+          {nowWx && (
+            <p className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <span aria-hidden="true" className={`inline-block ${nowWx.motion}`}>
+                {nowWx.emoji}
+              </span>
+              <span className="font-semibold text-slate-600 dark:text-slate-300">{weatherNow.temp}° now</span>
+              {rain && <span className="text-sky-600 dark:text-sky-400">· 🌧 {rain}</span>}
+            </p>
+          )}
+        </div>
 
-        {showMap && mappable(day).length > 0 && (
+        {/* one map at a time: in map mode this one steps aside */}
+        {showMap && !mapMode && mappable(day).length > 0 && (
           // panning the map is not a swipe to another day
           <div onTouchStart={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
             <DayMapPanel
               trip={trip}
               days={[day]}
-              runningId={plan.running ? plan.hero.item.id : null}
+              runningId={runningId}
               onStatus={setStatus}
               onEdit={item => setItemModal({ dayId: day.id, item })}
+              onExpand={() => {
+                setSelectedId(null)
+                setMapMode(true)
+              }}
               className="h-60"
             />
           </div>
         )}
 
-        {plan.total === 0 && (
-          <div className="rounded-2xl border-2 border-dashed border-slate-300 px-4 py-10 text-center dark:border-slate-700">
-            <p className="text-sm text-slate-500 dark:text-slate-400">Nothing is planned for this day.</p>
-            <button className={`${btnPrimary} mt-3`} onClick={() => setItemModal({ dayId: day.id })}>
-              <IconPlus className="size-4" />
-              Add a plan
-            </button>
-          </div>
-        )}
-
-        {plan.hero && (
-          <div>
-            <HeroCard
-              trip={trip}
-              entry={plan.hero}
-              label={plan.running ? 'Now' : isToday ? 'Next up' : 'First up'}
-              running={plan.running}
-              now={isToday ? minutes : null}
-              onEdit={() => setItemModal({ dayId: day.id, item: plan.hero.item })}
-              onStatus={status => setStatus(plan.hero.item, status)}
-            />
-            {plan.then && <Hop trip={trip} from={plan.hero} to={plan.then} />}
-          </div>
-        )}
-
-        {!plan.hero && plan.total > 0 && (
-          <div className="rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-            <p className="text-3xl">{plan.missed.length > 0 ? '🌙' : '🎉'}</p>
-            <p className="mt-2 text-sm font-semibold">
-              {isToday ? 'Nothing more is planned today' : 'Every plan of this day is marked'}
-            </p>
-            <p className="mt-0.5 text-[13px] text-slate-500 dark:text-slate-400">
-              {plan.missed.length > 0
-                ? 'Some plans have no result yet. Mark them below.'
-                : 'Every plan of this day carries a result.'}
-            </p>
-          </div>
-        )}
-
-        {plan.then && (
-          <Section title={plan.hero && plan.later.length > 0 ? 'Then' : 'Also today'}>
-            <PlanRow {...rowProps(plan.then)} clash={clashing.get(plan.then)} />
-          </Section>
-        )}
-
-        {plan.later.length > 0 && (
-          <Section title="Later" count={plan.later.length}>
-            {plan.later.map(entry => (
-              <PlanRow key={entry.item.id} {...rowProps(entry)} clash={clashing.get(entry)} />
-            ))}
-          </Section>
-        )}
-
-        {plan.missed.length > 0 && (
-          <Section title="Not marked yet" count={plan.missed.length}>
-            {plan.missed.map(entry => (
-              <PlanRow key={entry.item.id} {...rowProps(entry)} muted />
-            ))}
-          </Section>
-        )}
-
-        {plan.done.length > 0 && (
-          <Section title="Done and skipped" count={plan.done.length}>
-            {plan.done.map(entry => (
-              <PlanRow key={entry.item.id} {...rowProps(entry)} muted />
-            ))}
-          </Section>
-        )}
-
-        {plan.total > 0 && (
-          <div className="space-y-2.5 rounded-2xl bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:ring-slate-800">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <span className="tabular-nums">
-                <span key={plan.doneCount} className="anim-tick inline-block">
-                  {plan.doneCount}
-                </span>{' '}
-                of {plan.openCount} done
-              </span>
-              {cost > 0 && <span className="tabular-nums">{fmtMoney(cost, trip.currency)}</span>}
-              <span className="flex-1" />
-              <button className={btnChip} onClick={() => setItemModal({ dayId: day.id })}>
-                <IconPlus className="size-3.5" />
-                Add
-              </button>
-              <button className={btnChip} onClick={() => navigate(`/trip/${trip.id}`)}>
-                Full day list
-              </button>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-              <div
-                className="bar-fill h-full rounded-full bg-emerald-500"
-                style={{ '--fill': `${plan.openCount ? (plan.doneCount / plan.openCount) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-        )}
+        {dayList(false)}
       </main>
+
+      {/* one + to add to this day */}
+      <button
+        onClick={() => setItemModal({ dayId: day.id })}
+        className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,calc((100vw-42rem)/2+1rem))] z-30 grid size-14 place-items-center rounded-full bg-brand text-white shadow-lg shadow-brand/30 transition hover:bg-brand-600 active:scale-95 dark:bg-brand-600 dark:hover:bg-brand-500"
+        aria-label={`Add a plan to day ${dayIndex + 1}`}
+        title={`Add to day ${dayIndex + 1}`}
+      >
+        <IconPlus className="size-6" />
+      </button>
+
+      {mapMode && (
+        <MapMode
+          title={[`Day ${dayIndex + 1}`, day.date && fmtDate(day.date), day.title].filter(Boolean).join(' · ')}
+          onClose={() => setMapMode(false)}
+          map={offset => (
+            <DayMapPanel
+              trip={trip}
+              days={[day]}
+              runningId={runningId}
+              onStatus={setStatus}
+              onEdit={item => setItemModal({ dayId: day.id, item })}
+              bare
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onExpand={() => setMapMode(false)}
+              focusOffset={offset}
+            />
+          )}
+        >
+          {({ raise }) => (
+            <SheetSync selectedId={selectedId} onShow={raise}>
+              {dayList(true)}
+            </SheetSync>
+          )}
+        </MapMode>
+      )}
 
       {itemModal && (
         <ItemForm
@@ -638,6 +803,25 @@ export default function Today({ id, navigate }) {
       )}
     </div>
   )
+}
+
+// Keeps the sheet's picked row in view, raising a lowered sheet to show it.
+function SheetSync({ selectedId, onShow, children }) {
+  useEffect(() => {
+    if (!selectedId) return
+    onShow()
+    const t = setTimeout(
+      () =>
+        document
+          .querySelector(`[data-sheet] [data-plan="${selectedId}"]`)
+          ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }),
+      320,
+    )
+    return () => clearTimeout(t)
+    // onShow changes with the sheet's height; following the pick is enough
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
+  return children
 }
 
 // Trip mode remembers whether the map was shown.

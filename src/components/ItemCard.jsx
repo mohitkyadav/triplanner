@@ -96,6 +96,10 @@ function Card({
   rowProps,
   handleRef,
   handleProps,
+  vtPrefix = 'plan',
+  still = false,
+  selected = false,
+  muted = false,
 }) {
   const cat = catById(item.type)
   const title = titleFor(item)
@@ -149,10 +153,13 @@ function Card({
   return (
     <li
       ref={dragRef}
-      id={overlay ? undefined : `plan-${item.id}`}
+      id={overlay || still ? undefined : `plan-${item.id}`}
+      data-plan={item.id}
       {...rowProps}
       style={
-        overlay ? dragStyle : { ...dragStyle, viewTransitionName: vtName('plan', item.id), viewTransitionClass: 'plan' }
+        overlay
+          ? dragStyle
+          : { ...dragStyle, viewTransitionName: vtName(vtPrefix, item.id), viewTransitionClass: 'plan' }
       }
       className={`group/plan grid scroll-mt-40 select-none grid-cols-[2.25rem_2rem_minmax(0,1fr)] sm:grid-cols-[2.75rem_2rem_minmax(0,1fr)] gap-x-2.5 [-webkit-touch-callout:none] [touch-action:manipulation] ${
         ghost ? 'opacity-40' : ''
@@ -201,8 +208,10 @@ function Card({
         className={`card-focus col-start-3 row-start-1 flex min-w-0 items-start gap-1 rounded-xl bg-white py-2 pl-3 pr-1.5 ring-1 dark:bg-slate-900 ${
           overlay
             ? 'anim-lift shadow-2xl ring-brand-400 dark:ring-brand-500'
-            : 'shadow-sm ring-slate-200 dark:ring-slate-800'
-        } ${arrived ? 'anim-arrive' : ''}`}
+            : selected
+              ? 'shadow-md ring-2 ring-brand-500 dark:ring-brand-400'
+              : 'shadow-sm ring-slate-200 dark:ring-slate-800'
+        } ${arrived ? 'anim-arrive' : ''} ${muted ? 'opacity-60' : ''}`}
       >
         <div
           className="card-hit min-w-0 flex-1 cursor-pointer rounded-lg py-0.5"
@@ -278,14 +287,16 @@ function Card({
           <PopIcon icon={status.icon} state={item.status} className="size-5.5" />
         </button>
         {/* with a mouse the grip shows on hover; on a phone, long-press the card */}
-        <button
-          ref={handleRef}
-          {...handleProps}
-          className="-ml-0.5 mt-1 shrink-0 cursor-grab rounded p-0.5 text-slate-300 opacity-0 transition group-hover/plan:opacity-100 focus-visible:opacity-100 active:cursor-grabbing pointer-coarse:hidden dark:text-slate-600"
-          aria-label="Reorder"
-        >
-          <IconGrip className="size-4" />
-        </button>
+        {!still && (
+          <button
+            ref={handleRef}
+            {...handleProps}
+            className="-ml-0.5 mt-1 shrink-0 cursor-grab rounded p-0.5 text-slate-300 opacity-0 transition group-hover/plan:opacity-100 focus-visible:opacity-100 active:cursor-grabbing pointer-coarse:hidden dark:text-slate-600"
+            aria-label="Reorder"
+          >
+            <IconGrip className="size-4" />
+          </button>
+        )}
       </div>
 
       {/* what lies before the next stop */}
@@ -325,6 +336,12 @@ export default function ItemCard({ trip, item, leg, first, last, onEdit, onSetSt
       handleProps={{ ...attributes, ...handleListeners }}
     />
   )
+}
+
+/* The same row, standing still: no dragging, for Trip mode's timeline.
+   vtPrefix 'now' lets a row and Trip mode's lead card morph into each other. */
+export function PlanRow(props) {
+  return <Card {...props} still />
 }
 
 // Rendered inside <DragOverlay> — same card, no sortable wiring.

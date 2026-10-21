@@ -131,3 +131,83 @@ export function useWeather(trip) {
 
   return days
 }
+
+/* ---------- the next few hours (Trip mode, today only) ---------- */
+
+const NOW_KEY = 'triplanner:weather-now'
+const NOW_FRESH_FOR = 30 * 60 * 1000
+
+function readNow(key) {
+  try {
+    return JSON.parse(localStorage.getItem(NOW_KEY))?.[key] ?? null
+  } catch {
+    return null
+  }
+}
+
+function writeNow(key, entry) {
+  try {
+    localStorage.setItem(NOW_KEY, JSON.stringify({ [key]: entry }))
+  } catch {
+    // full storage — it is asked for again next time
+  }
+}
+
+/* { temp, code, hours: [{ time: 'HH:MM', rain, code }] } — the weather now
+   and for the next 12 hours at the destination, refreshed every half hour
+   while `active` (the day shown is today). Same service, same switch. */
+export function useWeatherNow(trip, active) {
+  const [on] = useOnlineEnabled()
+  const dest = (trip?.destination ?? '').trim()
+  const key = dest.toLowerCase()
+  const relevant = Boolean(on && active && dest)
+  const [found, setFound] = useState(() => ({ key, data: readNow(key) }))
+
+  useEffect(() => {
+    if (!relevant) return
+    const cached = readNow(key)
+    if (cached) setFound({ key, data: cached })
+    if (cached && Date.now() - cached.at < NOW_FRESH_FOR) return
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+    const ctrl = new AbortController()
+    ;(async () => {
+      try {
+        const place = readCache()[key]?.place ?? (await geocode(dest, ctrl.signal))
+        if (!place) return
+        const url =
+          `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}` +
+          '&current=temperature_2m,weather_code&hourly=precipitation_probability,weather_code' +
+          '&forecast_hours=12&timezone=auto'
+        const res = await fetch(url, { signal: ctrl.signal })
+        if (!res.ok) return
+        const body = await res.json()
+        const h = body.hourly ?? {}
+        const entry = {
+          at: Date.now(),
+          temp: Math.round(body.current?.temperature_2m),
+          code: body.current?.weather_code,
+          hours: (h.time ?? []).map((t, i) => ({
+            time: String(t).slice(11, 16),
+            rain: h.precipitation_probability?.[i] ?? 0,
+            code: h.weather_code?.[i],
+          })),
+        }
+        writeNow(key, entry)
+        setFound({ key, data: entry })
+      } catch {
+        // offline or the service is down — keep what we have
+      }
+    })()
+    return () => ctrl.abort()
+  }, [relevant, key, dest])
+
+  return relevant && found.key === key ? found.data : null
+}
+
+// "🌧 rain likely around 16:00" — the first of the coming hours with a good
+// chance of rain, or '' when the next hours look dry.
+export function rainAhead(now) {
+  const wet = now?.hours?.find(h => h.rain >= 50)
+  if (!wet) return ''
+  return wet === now.hours[0] ? 'rain likely now' : `rain likely around ${wet.time}`
+}
