@@ -75,6 +75,7 @@ function normalizeItem(raw) {
     ...(type === 'flight' && { flightNo: str(i.flightNo), from: str(i.from), to: str(i.to) }),
     ...(type === 'hotel' && {
       hotelAction: i.hotelAction === 'check-out' ? 'check-out' : 'check-in',
+      ...(str(i.stayId) && { stayId: str(i.stayId) }),
     }),
     ...(attachments.length > 0 && { attachments }),
     ...(geo(i.geo) && { geo: geo(i.geo) }),

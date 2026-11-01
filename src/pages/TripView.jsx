@@ -58,7 +58,7 @@ import { fmtClock, startOf } from '../lib/schedule'
 import { leaveTrip } from '../lib/shares'
 import { makeDay, placeByTime, sortDays, uid, useStore } from '../lib/store'
 import { syncEnabled } from '../lib/sync'
-import { computeStays } from '../lib/stays'
+import { computeStays, findStay, stayActions } from '../lib/stays'
 import { useWeather } from '../lib/weather'
 import { vtName } from '../lib/motion'
 
@@ -313,9 +313,12 @@ export default function TripView({ id, navigate }) {
     })
   }
 
-  function saveItem(data, toDayId) {
+  function saveItem(data, toDayId, stay) {
     const { dayId, item } = itemModal
-    if (item) {
+    if (stay) {
+      // a hotel: its check-in and check-out together
+      stayActions(trip, { editing: item, data, ...stay }).forEach(dispatch)
+    } else if (item) {
       dispatch({ type: 'item/update', tripId: trip.id, dayId, toDayId, itemId: item.id, patch: data })
     } else {
       dispatch({ type: 'item/add', tripId: trip.id, dayId: toDayId ?? dayId, item: { id: uid(), ...data } })
@@ -323,14 +326,22 @@ export default function TripView({ id, navigate }) {
     setItemModal(null)
   }
 
+  // Deletes the plan — for a hotel, its whole stay — with one Undo for all.
   function deleteItem() {
     const { dayId, item } = itemModal
-    const index = trip.days.find(d => d.id === dayId)?.items.findIndex(i => i.id === item.id)
-    dispatch({ type: 'item/delete', tripId: trip.id, dayId, itemId: item.id })
+    const stay = item.type === 'hotel' ? findStay(trip, item) : null
+    const gone = (stay ? [stay.in, stay.out] : [{ item, dayId }]).filter(Boolean).map(p => ({
+      ...p,
+      index: trip.days.find(d => d.id === p.dayId)?.items.findIndex(i => i.id === p.item.id),
+    }))
+    gone.forEach(p => dispatch({ type: 'item/delete', tripId: trip.id, dayId: p.dayId, itemId: p.item.id }))
     setItemModal(null)
-    toast('Plan deleted', {
+    toast(gone.length > 1 ? 'Stay deleted' : 'Plan deleted', {
       label: 'Undo',
-      onClick: () => dispatch({ type: 'item/add', tripId: trip.id, dayId, item, index }),
+      onClick: () =>
+        gone.forEach(p =>
+          dispatch({ type: 'item/add', tripId: trip.id, dayId: p.dayId, item: p.item, index: p.index }),
+        ),
     })
   }
 

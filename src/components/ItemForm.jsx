@@ -4,6 +4,7 @@ import { CATEGORIES } from '../lib/categories'
 import { fmtDate } from '../lib/dates'
 import { useFlightRoute } from '../lib/flightRoute'
 import { coordsFromLink } from '../lib/geo'
+import { findStay } from '../lib/stays'
 import { placeLinks } from '../lib/maps'
 import { reducedMotion } from '../lib/motion'
 import AirlineLogo from './AirlineLogo'
@@ -17,8 +18,7 @@ import {
   Field,
   IconCheckCircle,
   IconCircle,
-  IconLogIn,
-  IconLogOut,
+  IconBed,
   IconXCircle,
   inputCls,
   Modal,
@@ -38,35 +38,61 @@ const NOTE_HINTS = {
 
 const dayName = (day, i) => [`Day ${i + 1}`, day.date && fmtDate(day.date), day.title].filter(Boolean).join(' · ')
 
-/* onSave(item, toDayId) — `toDayId` is the day the plan belongs on, which the
-   form lets the user change ("Move to day…") when `days` is given. */
-export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave, onDelete, onClose }) {
+/* onSave(item, toDayId, stay) — `toDayId` is the day the plan belongs on,
+   which the form lets the user change ("Move to day…") when `days` is given.
+   A hotel is a whole stay: `stay` is { checkIn: { dayId, time }, checkOut:
+   { dayId, time } | null } and the caller saves both plans (lib/stays.js). */
+export default function ItemForm({ initial, dayLabel, trip, days: givenDays, dayId, onSave, onDelete, onClose }) {
   const toast = useToast()
   const editing = Boolean(initial?.id)
-  const [type, setType] = useState(initial?.type ?? 'landmark')
-  const [status, setStatus] = useState(initial?.status ?? 'planned')
+  const days = givenDays ?? trip?.days ?? []
+  // A hotel plan opens its whole stay; a check-out opens with its check-in's
+  // details (name, cost, documents live there).
+  const [stay] = useState(() => (initial?.type === 'hotel' && trip ? findStay(trip, initial) : null))
+  const start = stay?.in?.item ?? initial
+  const [type, setType] = useState(start?.type ?? 'landmark')
+  const [status, setStatus] = useState(start?.status ?? 'planned')
   const [targetDay, setTargetDay] = useState(dayId)
-  const [docs, setDocs] = useState(initial?.attachments ?? [])
-  const [spot, setSpot] = useState(initial?.geo ?? null) // where it shows on the day map
+  const [docs, setDocs] = useState(start?.attachments ?? [])
+  const [spot, setSpot] = useState(start?.geo ?? null) // where it shows on the day map
   // The field place suggestions follow: the name or the map text, whichever
   // was typed in last; none once another field is in use.
   const [searchIn, setSearchIn] = useState(null)
   const nameRef = useRef(null)
   const [f, setF] = useState({
-    title: initial?.title ?? '',
-    time: initial?.time ?? '',
-    endTime: initial?.endTime ?? '',
-    cost: initial?.cost != null ? String(initial.cost) : '',
-    currency: initial?.currency ?? '',
-    paid: Boolean(initial?.paid),
-    paidBy: initial?.paidBy ?? '',
-    place: initial?.place ?? '',
-    notes: initial?.notes ?? '',
-    flightNo: initial?.flightNo ?? '',
-    from: initial?.from ?? '',
-    to: initial?.to ?? '',
-    hotelAction: initial?.hotelAction === 'check-out' ? 'check-out' : 'check-in',
+    title: start?.title ?? '',
+    time: start?.time ?? '',
+    endTime: start?.endTime ?? '',
+    cost: start?.cost != null ? String(start.cost) : '',
+    currency: start?.currency ?? '',
+    paid: Boolean(start?.paid),
+    paidBy: start?.paidBy ?? '',
+    place: start?.place ?? '',
+    notes: start?.notes ?? '',
+    flightNo: start?.flightNo ?? '',
+    from: start?.from ?? '',
+    to: start?.to ?? '',
   })
+  // A stay: the day and time of the check-in and of the check-out ('' for
+  // none yet). A new stay checks out the next day, when there is one.
+  const dayAt = i => days[i]?.id ?? ''
+  const indexOf = id => days.findIndex(d => d.id === id)
+  const [stayIn, setStayIn] = useState(() => ({
+    dayId: stay?.in?.dayId ?? (initial?.hotelAction === 'check-out' ? dayAt(Math.max(0, indexOf(dayId) - 1)) : dayId),
+    time: stay?.in?.item.time ?? '',
+  }))
+  const [stayOut, setStayOut] = useState(() => ({
+    dayId: stay?.out?.dayId ?? (editing ? '' : dayAt(indexOf(dayId) + 1)),
+    time: stay?.out?.item.time ?? '',
+  }))
+  const nights = stayOut.dayId ? indexOf(stayOut.dayId) - indexOf(stayIn.dayId) : 0
+  function moveCheckIn(id) {
+    setStayIn(prev => ({ ...prev, dayId: id }))
+    // a check-out on or before the new check-in day moves to the day after
+    if (stayOut.dayId && indexOf(stayOut.dayId) <= indexOf(id))
+      setStayOut(prev => ({ ...prev, dayId: dayAt(indexOf(id) + 1) }))
+  }
+
   // The flight number whose usual route has been looked at.
   const [routeFor, setRouteFor] = useState(null)
   const [filled, setFilled] = useState(null) // the route the airports were filled from
@@ -123,7 +149,11 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
       item.from = f.from.trim()
       item.to = f.to.trim()
     }
-    if (type === 'hotel') item.hotelAction = f.hotelAction
+    if (type === 'hotel') {
+      item.hotelAction = 'check-in'
+      item.time = stayIn.time
+      return onSave(item, stayIn.dayId, { checkIn: stayIn, checkOut: stayOut.dayId ? stayOut : null })
+    }
     onSave(item, targetDay)
   }
 
@@ -216,7 +246,7 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
   )
 
   return (
-    <Modal title={editing ? 'Edit plan' : `Add to ${dayLabel}`} onClose={onClose}>
+    <Modal title={editing ? (type === 'hotel' ? 'Edit stay' : 'Edit plan') : `Add to ${dayLabel}`} onClose={onClose}>
       <form
         onSubmit={submit}
         className="space-y-4"
@@ -302,17 +332,6 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
           </>
         )}
 
-        {type === 'hotel' && (
-          <Segmented
-            value={f.hotelAction}
-            onChange={v => setF(prev => ({ ...prev, hotelAction: v }))}
-            options={[
-              { value: 'check-in', label: 'Check-in', icon: IconLogIn },
-              { value: 'check-out', label: 'Check-out', icon: IconLogOut },
-            ]}
-          />
-        )}
-
         <Field label={titleLabel}>
           <input
             ref={nameRef}
@@ -329,9 +348,58 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
         {searching && searchIn === 'title' && <PlaceSuggestions trip={trip} text={f.title} onPick={pick} />}
 
         {type === 'hotel' && (
-          <Field label="Time (optional)">
-            <PickerInput type="time" value={f.time} onChange={set('time')} />
-          </Field>
+          <div className="space-y-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3">
+              <Field label="Check-in">
+                <select className={inputCls} value={stayIn.dayId} onChange={e => moveCheckIn(e.target.value)}>
+                  {days.map((d, i) => (
+                    <option key={d.id} value={d.id}>
+                      {dayName(d, i)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Time">
+                <PickerInput
+                  type="time"
+                  value={stayIn.time}
+                  onChange={e => setStayIn(prev => ({ ...prev, time: e.target.value }))}
+                  aria-label="Check-in time"
+                />
+              </Field>
+              <Field label="Check-out">
+                <select
+                  className={inputCls}
+                  value={stayOut.dayId}
+                  onChange={e => setStayOut(prev => ({ ...prev, dayId: e.target.value }))}
+                >
+                  <option value="">Not set yet</option>
+                  {days.map((d, i) =>
+                    i > indexOf(stayIn.dayId) ? (
+                      <option key={d.id} value={d.id}>
+                        {dayName(d, i)}
+                      </option>
+                    ) : null,
+                  )}
+                </select>
+              </Field>
+              <Field label="Time">
+                <PickerInput
+                  type="time"
+                  value={stayOut.time}
+                  onChange={e => setStayOut(prev => ({ ...prev, time: e.target.value }))}
+                  disabled={!stayOut.dayId}
+                  aria-label="Check-out time"
+                />
+              </Field>
+            </div>
+            <p className="-mt-1 flex items-center gap-1.5 text-[13px] text-slate-400 dark:text-slate-500">
+              <IconBed className="size-3.5 shrink-0" />
+              {nights > 0
+                ? `${nights} night${nights === 1 ? '' : 's'} — the check-out shows on its day too.`
+                : 'Add the check-out day and it shows on that day too.'}
+            </p>
+          </div>
         )}
         {type !== 'flight' && type !== 'hotel' && (
           <div className="grid grid-cols-2 gap-3">
@@ -344,7 +412,7 @@ export default function ItemForm({ initial, dayLabel, trip, days, dayId, onSave,
           </div>
         )}
 
-        {otherDays && (
+        {otherDays && type !== 'hotel' && (
           <Field label={editing ? 'Day (change it to move the plan)' : 'Day'}>
             <select className={inputCls} value={targetDay} onChange={e => setTargetDay(e.target.value)}>
               {days.map((d, i) => (

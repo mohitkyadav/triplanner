@@ -245,6 +245,7 @@ export function readBooking(text, trip) {
       const explicit = CHECK_OUT.test(summary) ? 'check-out' : CHECK_IN.test(summary) ? 'check-in' : null
       const nights = end?.date ? daysBetween(start.date, end.date) : 0
       const title = cleanTitle(summary) || 'Hotel'
+      const stayId = `stay-${key}` // links the check-in and check-out of one booking
       const hotel = (action, when, suffix) => ({
         key: `${key}-${action}`,
         date: when.date,
@@ -257,6 +258,7 @@ export function readBooking(text, trip) {
           time: when.time,
           place: location,
           notes: suffix ? notes : '',
+          ...(!explicit && nights >= 1 && { stayId }),
         },
       })
       // One event covering the whole stay becomes a check-in and a check-out.

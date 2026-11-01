@@ -207,4 +207,41 @@ describe('Triplanner', () => {
     const search = fetch.mock.calls.map(([u]) => new URL(u)).find(u => u.searchParams.get('q') === 'Cervejaria Ramiro')
     expect(search.searchParams.get('lat')).toBe('38.72')
   })
+
+  it('saves a hotel stay as a check-in and a check-out, edited together', async () => {
+    const user = userEvent.setup()
+    openApp([lisbon()], '/trip/trip-1')
+    const days = () => stored().trips[0].days
+
+    await user.click(screen.getByRole('button', { name: 'Add a plan to day 1' }))
+    let dialog = screen.getByRole('dialog', { name: 'Add to day 1' })
+    await user.click(within(dialog).getByRole('radio', { name: /Hotel/ }))
+    await user.type(within(dialog).getByLabelText('Hotel name'), 'Memmo Alfama')
+    fireEvent.change(within(dialog).getByLabelText('Check-in time'), { target: { value: '15:00' } })
+    await user.selectOptions(within(dialog).getByLabelText('Check-out'), 'd3')
+    fireEvent.change(within(dialog).getByLabelText('Check-out time'), { target: { value: '11:00' } })
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => expect(days()[2].items).toHaveLength(1))
+    const checkIn = days()[0].items.find(i => i.type === 'hotel')
+    const checkOut = days()[2].items[0]
+    expect(checkIn).toMatchObject({ title: 'Memmo Alfama', hotelAction: 'check-in', time: '15:00' })
+    expect(checkOut).toMatchObject({
+      title: 'Memmo Alfama',
+      hotelAction: 'check-out',
+      time: '11:00',
+      stayId: checkIn.stayId,
+    })
+    // the night between shows where you sleep
+    expect(within(document.getElementById('day-d2')).getByTitle('Staying at Memmo Alfama')).toBeInTheDocument()
+
+    // Opening the check-out opens the whole stay; dropping the check-out removes it.
+    await user.click(within(document.getElementById('day-d3')).getByRole('button', { name: 'Edit Memmo Alfama' }))
+    dialog = screen.getByRole('dialog', { name: 'Edit stay' })
+    expect(within(dialog).getByLabelText('Check-in time')).toHaveValue('15:00')
+    await user.selectOptions(within(dialog).getByLabelText('Check-out'), '')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(days()[2].items).toHaveLength(0))
+    expect(days()[0].items.filter(i => i.type === 'hotel')).toHaveLength(1)
+  })
 })
