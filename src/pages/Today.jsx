@@ -37,7 +37,7 @@ import { airportCity, catById, titleFor } from '../lib/categories'
 import { deviceTimeZone, fmtDate } from '../lib/dates'
 import { dayRouteUrl, pairRouteUrl } from '../lib/maps'
 import { costCurrency, dayCost, fmtMoney } from '../lib/money'
-import { useAirlineColor } from '../lib/airlineColor'
+import { tintStyle, useAirlineColors } from '../lib/airlineColor'
 import { reducedMotion, transition, vtName } from '../lib/motion'
 import { dayPlan, fmtClock, fmtDuration, fmtTimes, gapBetween, useClock } from '../lib/schedule'
 import { uid, useStore } from '../lib/store'
@@ -116,8 +116,8 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
   const { item } = entry
   const [viewing, setViewing] = useState(null) // the document open full screen
   const ticket = item.attachments?.[0] ?? null
-  // a flight wears a faint tint of its airline's colour
-  const accent = useAirlineColor(item.type === 'flight' ? airlineFromFlightNo(item.flightNo)?.iata : null)
+  // a flight fades softly through its airline's logo colours
+  const accent = useAirlineColors(item.type === 'flight' ? airlineFromFlightNo(item.flightNo)?.iata : null)
   const cities =
     item.type === 'flight' && airportCity(item.from) && airportCity(item.to)
       ? `${airportCity(item.from)} → ${airportCity(item.to)}`
@@ -134,7 +134,7 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
       className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 dark:bg-slate-900 ${
         running ? 'ring-2 ring-brand-500 dark:ring-brand-400' : 'ring-slate-200 dark:ring-slate-800'
       } ${accent ? `flight-tint ${running ? '' : 'flight-tint-ring'}` : ''}`}
-      style={{ ...planName(item), ...(accent && { '--accent': accent }) }}
+      style={{ ...planName(item), ...tintStyle(accent) }}
     >
       <div className="flex items-center gap-2 px-4 pt-3.5">
         <span

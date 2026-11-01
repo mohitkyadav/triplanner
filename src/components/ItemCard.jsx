@@ -5,7 +5,7 @@ import { airlineFromFlightNo, flightTrackerUrl } from '../lib/airlines'
 import { airportCity, catById, flightCodes, titleFor } from '../lib/categories'
 import { placeLinks } from '../lib/maps'
 import { costCurrency, fmtMoney } from '../lib/money'
-import { useAirlineColor } from '../lib/airlineColor'
+import { tintStyle, useAirlineColors } from '../lib/airlineColor'
 import { vtName } from '../lib/motion'
 import { fmtClock, fmtDuration, endOf, startOf } from '../lib/schedule'
 import { fmtKm } from '../lib/timeline'
@@ -107,8 +107,8 @@ function Card({
   const status = STATUS_UI[item.status] ?? STATUS_UI.planned
   const skipped = item.status === 'skipped'
   const airline = item.type === 'flight' ? airlineFromFlightNo(item.flightNo) : null
-  // a flight's card wears a faint tint of its airline's colour
-  const accent = useAirlineColor(airline?.iata)
+  // a flight's card fades softly through its airline's logo colours
+  const accent = useAirlineColors(airline?.iata)
   const tracker = item.type === 'flight' ? flightTrackerUrl(item.flightNo) : null
   const links = item.type === 'flight' ? null : placeLinks(trip, item)
   const directions = links && (links.kind === 'link' ? links.url : links.google)
@@ -215,7 +215,7 @@ function Card({
               ? 'shadow-md ring-2 ring-brand-500 dark:ring-brand-400'
               : `shadow-sm ring-slate-200 dark:ring-slate-800 ${accent ? 'flight-tint-ring' : ''}`
         } ${accent ? 'flight-tint' : ''} ${arrived ? 'anim-arrive' : ''} ${muted ? 'opacity-60' : ''}`}
-        style={accent ? { '--accent': accent } : undefined}
+        style={accent ? tintStyle(accent) : undefined}
       >
         <div
           className="card-hit min-w-0 flex-1 cursor-pointer rounded-lg py-0.5"
