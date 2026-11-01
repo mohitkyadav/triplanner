@@ -542,8 +542,12 @@ html[data-vt='theme']::view-transition-new(root) {
 }
 
 /* ---------- pins on the day map (components/DayMap.jsx) ----------
-   MapLibre positions a marker with `transform`, so the pins grow with
-   `scale` instead. */
+   MapLibre places a marker with `transform` (translate(-50%, -50%) to its
+   point). A pin must never get `scale`, `translate` or `rotate` of its own:
+   the browser applies those around the marker's corner of the map, so a
+   scaled pin slides off its point — further the further it is from the
+   map's top-left, and more as you zoom. The picked pin grows by its size
+   instead, which the -50% keeps centred. */
 .map-pin {
   display: grid;
   place-items: center;
@@ -562,7 +566,8 @@ html[data-vt='theme']::view-transition-new(root) {
   transition:
     background-color 0.25s,
     opacity 0.25s,
-    scale 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    width 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    height 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .map-pin:focus-visible {
   outline: 3px solid var(--color-accent);
@@ -598,7 +603,9 @@ html[data-vt='theme']::view-transition-new(root) {
   border-style: dashed;
 }
 .map-pin--selected {
-  scale: 1.25;
+  width: 38px;
+  height: 38px;
+  font-size: 15px;
   z-index: 2;
 }
 @keyframes pin-ping {
