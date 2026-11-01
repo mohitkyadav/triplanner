@@ -3,7 +3,19 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Airline logos through the app's own address in dev and preview, as Netlify
+// does in production (netlify.toml), so the app may read their colours.
+const logos = {
+  '/logos': {
+    target: 'https://images.kiwi.com',
+    changeOrigin: true,
+    rewrite: path => path.replace(/^\/logos/, '/airlines/128x128'),
+  },
+}
+
 export default defineConfig({
+  server: { proxy: logos },
+  preview: { proxy: logos },
   plugins: [
     react(),
     tailwindcss(),
@@ -44,7 +56,8 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /^https:\/\/images\.kiwi\.com\//,
+            // airline logos, served through the app's own /logos/
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/logos/'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'airline-logos',

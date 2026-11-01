@@ -624,3 +624,42 @@ html[data-vt='theme']::view-transition-new(root) {
 .maplibregl-ctrl-top-right {
   padding-top: env(safe-area-inset-top);
 }
+
+/* ---------- dropdowns ----------
+   Safari, Chrome on macOS and iOS draw a <select> their own way (a small
+   system popup button) and ignore padding and background, so it never
+   matched the other fields. `appearance: none` hands it to our styles, and
+   the chevron is drawn here. Unlayered, so it wins over the px-* utility. */
+.select-field {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  background-size: 1.1rem;
+  padding-right: 2.5rem;
+  text-overflow: ellipsis;
+}
+.select-field--small {
+  background-position: right 0.45rem center;
+  background-size: 0.9rem;
+  padding-right: 1.6rem;
+}
+
+/* ---------- a flight's airline colour ----------
+   A flight card (ItemCard, Trip mode's lead card) wears a faint tint of its
+   airline's brand colour, `--accent`, picked from the logo
+   (lib/airlineColor.js): just enough to tell a flight at a glance. The
+   ring follows it, softly, unless the card is lit for another reason. */
+.flight-tint {
+  background-color: color-mix(in srgb, var(--accent) 7%, #fff);
+}
+.flight-tint-ring {
+  --tw-ring-color: color-mix(in srgb, var(--accent) 20%, #e2e8f0);
+}
+[data-theme='dark'] .flight-tint {
+  background-color: color-mix(in srgb, var(--accent) 14%, #0f172a);
+}
+[data-theme='dark'] .flight-tint-ring {
+  --tw-ring-color: color-mix(in srgb, var(--accent) 26%, #1e293b);
+}

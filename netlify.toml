@@ -2,6 +2,15 @@
   command = "npm run build"
   publish = "dist"
 
+# Airline logos through the app's own address, so the app may read their
+# pixels (for the flight card's brand tint). The logo server sends no CORS
+# header, which would otherwise keep the pixels out of reach.
+[[redirects]]
+  from = "/logos/*"
+  to = "https://images.kiwi.com/airlines/128x128/:splat"
+  status = 200
+  force = true
+
 # SPA fallback — all routes serve the app shell
 [[redirects]]
   from = "/*"

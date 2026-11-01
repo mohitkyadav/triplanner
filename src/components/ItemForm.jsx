@@ -22,6 +22,7 @@ import {
   IconXCircle,
   inputCls,
   Modal,
+  selectCls,
   PickerInput,
   Segmented,
   useToast,
@@ -227,7 +228,7 @@ export default function ItemForm({ initial, dayLabel, trip, days: givenDays, day
             <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
               Paid by
               <select
-                className="rounded-lg bg-slate-100 px-2 py-1 text-sm dark:bg-slate-800"
+                className="select-field select-field--small rounded-lg bg-slate-100 py-1 pl-2 text-sm dark:bg-slate-800"
                 value={f.paidBy}
                 onChange={set('paidBy')}
               >
@@ -351,7 +352,7 @@ export default function ItemForm({ initial, dayLabel, trip, days: givenDays, day
           <div className="space-y-3">
             <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3">
               <Field label="Check-in">
-                <select className={inputCls} value={stayIn.dayId} onChange={e => moveCheckIn(e.target.value)}>
+                <select className={selectCls} value={stayIn.dayId} onChange={e => moveCheckIn(e.target.value)}>
                   {days.map((d, i) => (
                     <option key={d.id} value={d.id}>
                       {dayName(d, i)}
@@ -369,7 +370,7 @@ export default function ItemForm({ initial, dayLabel, trip, days: givenDays, day
               </Field>
               <Field label="Check-out">
                 <select
-                  className={inputCls}
+                  className={selectCls}
                   value={stayOut.dayId}
                   onChange={e => setStayOut(prev => ({ ...prev, dayId: e.target.value }))}
                 >
@@ -414,7 +415,7 @@ export default function ItemForm({ initial, dayLabel, trip, days: givenDays, day
 
         {otherDays && type !== 'hotel' && (
           <Field label={editing ? 'Day (change it to move the plan)' : 'Day'}>
-            <select className={inputCls} value={targetDay} onChange={e => setTargetDay(e.target.value)}>
+            <select className={selectCls} value={targetDay} onChange={e => setTargetDay(e.target.value)}>
               {days.map((d, i) => (
                 <option key={d.id} value={d.id}>
                   {dayName(d, i)}

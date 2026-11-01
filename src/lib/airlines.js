@@ -20,7 +20,9 @@ export function airlineFromFlightNo(flightNo) {
 
 // One canonical 128×128 (2× retina for the largest chip) image per airline —
 // every UI spot shares the same URL, so the service worker caches one file.
-export const airlineLogoUrl = iata => `https://images.kiwi.com/airlines/128/${iata}.png`
+// Served through the app's own address (/logos/, forwarded to Kiwi's CDN by
+// Netlify and by the dev server), so the app may read the logo's colours.
+export const airlineLogoUrl = iata => `/logos/${iata}.png`
 
 // "lh 1178" → "LH1178"; null when the text is not a flight number.
 export function callsign(flightNo) {

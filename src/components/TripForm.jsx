@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { addDaysISO, daysBetween, deviceTimeZone, timeZones } from '../lib/dates'
-import { btnGhost, btnPrimary, Field, inputCls, Modal, PickerInput, Segmented } from './ui'
+import { btnGhost, btnPrimary, Field, inputCls, Modal, PickerInput, Segmented, selectCls } from './ui'
 
 const plural = (n, word) => `${n} ${word}${Math.abs(n) === 1 ? '' : 's'}`
 
@@ -121,7 +121,7 @@ export default function TripForm({ initial, onSave, onClose }) {
         )}
 
         <Field label="Time zone">
-          <select className={inputCls} value={f.timeZone} onChange={set('timeZone')}>
+          <select className={selectCls} value={f.timeZone} onChange={set('timeZone')}>
             <option value="">This device’s time{device ? ` (${device.replaceAll('_', ' ')})` : ''}</option>
             {zones.map(z => (
               <option key={z} value={z}>

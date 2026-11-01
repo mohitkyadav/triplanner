@@ -360,6 +360,8 @@ export const btnChipBrand =
 // auto-zoom on focus, which leaves the page horizontally scrollable.
 export const inputCls =
   'w-full rounded-xl border-0 bg-slate-100 px-3.5 py-2.5 text-base text-slate-900 outline-none ring-1 ring-transparent transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-brand-400'
+// A dropdown that looks like the other fields on every browser (index.css).
+export const selectCls = `${inputCls} select-field min-h-11`
 
 /* An icon that pops when `state` changes — not when it first shows. */
 export function PopIcon({ icon: Icon, state, className = '' }) {
