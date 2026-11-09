@@ -2,6 +2,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { migrate, useStore } from './store'
 import { supabase } from './supabase'
 import { mergeTrip } from './tripMerge'
+import { uploadFiles } from './files'
 
 /* Sync with the chapri-apps account. The device stays the source of truth and
    works offline; when signed in, each trip is copied to the account and the
@@ -511,6 +512,8 @@ export function SyncEngine() {
           updateBases(Object.fromEntries(done.map(p => [p.key, p.deleted ? null : p.trip])))
         }
         setStatus({ state: 'synced', at: new Date().toISOString(), error: null })
+        // documents the account does not have yet follow the trips up
+        uploadFiles(latest.current, userId)
       } catch (err) {
         // Refused by the server's rules: the account may have been set back to pending.
         if (err?.code === '42501') refreshMembership()

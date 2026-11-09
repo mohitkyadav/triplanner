@@ -244,4 +244,30 @@ describe('Triplanner', () => {
     await waitFor(() => expect(days()[2].items).toHaveLength(0))
     expect(days()[0].items.filter(i => i.type === 'hotel')).toHaveLength(1)
   })
+
+  it('keeps documents to 500 kB and offers to shrink a photo that is bigger', async () => {
+    const user = userEvent.setup()
+    openApp([lisbon()], '/trip/trip-1')
+    await user.click(screen.getByRole('button', { name: 'Edit Dinner at Ramiro' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit plan' })
+    const attach = within(dialog).getByTestId('attach-input')
+    const file = (name, type, bytes) => new File([new Uint8Array(bytes)], name, { type })
+
+    await user.upload(attach, file('ticket.pdf', 'application/pdf', 120_000))
+    expect(await within(dialog).findByRole('button', { name: 'ticket.pdf' })).toBeInTheDocument()
+
+    // a PDF over the limit is not added, and says why
+    await user.upload(attach, file('menu.pdf', 'application/pdf', 2_000_000))
+    let alert = await within(dialog).findByRole('alert')
+    expect(alert).toHaveTextContent('“menu.pdf” is 2.0 MB — documents can be up to 500 kB')
+    expect(within(alert).queryByRole('button', { name: 'Make it smaller and attach' })).not.toBeInTheDocument()
+    await user.click(within(alert).getByRole('button', { name: 'OK' }))
+
+    // a photo over the limit can be made smaller instead
+    await user.upload(attach, file('pass.jpg', 'image/jpeg', 1_200_000))
+    alert = await within(dialog).findByRole('alert')
+    expect(alert).toHaveTextContent('“pass.jpg” is 1.2 MB')
+    expect(within(alert).getByRole('button', { name: 'Make it smaller and attach' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'pass.jpg' })).not.toBeInTheDocument()
+  })
 })

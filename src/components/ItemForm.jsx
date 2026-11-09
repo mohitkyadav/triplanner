@@ -458,7 +458,7 @@ export default function ItemForm({ initial, dayLabel, trip, days: givenDays, day
 
         <div>
           <span className="mb-1.5 block text-[13px] font-medium text-slate-500 dark:text-slate-400">Documents</span>
-          <DocumentList docs={docs} onChange={setDocs} onError={toast} />
+          <DocumentList docs={docs} trip={trip} onChange={setDocs} onError={toast} />
         </div>
 
         {editing && (

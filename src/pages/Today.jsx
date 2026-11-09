@@ -193,7 +193,7 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
           {item.notes && (
             <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">{item.notes}</p>
           )}
-          <DocumentChips docs={item.attachments} className="mt-2.5" />
+          <DocumentChips docs={item.attachments} trip={trip} className="mt-2.5" />
         </div>
       </div>
 
@@ -212,7 +212,7 @@ function HeroCard({ trip, entry, label, running, now, onEdit, onStatus }) {
           </button>
         </div>
       )}
-      {viewing && <DocumentViewer doc={viewing} onClose={() => setViewing(null)} />}
+      {viewing && <DocumentViewer doc={viewing} trip={trip} onClose={() => setViewing(null)} />}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
         <button className={btnChipBrand} onClick={() => onStatus('done')}>

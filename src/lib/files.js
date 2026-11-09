@@ -1,36 +1,185 @@
 import { fileDelete, fileEntries, fileGet, filePut } from './idb'
+import { supabase } from './supabase'
 import { uid } from './uid'
 
 /* Documents attached to a plan — boarding passes, tickets, confirmations.
 
-   The file itself lives in IndexedDB under its own id, never in the trip
-   JSON, so localStorage stays small and a plan only carries
-   { id, name, type, size }. Documents stay on this device: backups and share
-   links carry the reference, not the file. */
+   The file lives in IndexedDB under its own id, never in the trip JSON, so
+   localStorage stays small and a plan only carries { id, name, type, size }.
+   With an account it is also kept in the backend's storage (the private
+   bucket `triplanner-documents`, see chapri-apps), at
+   `<trip owner>/<trip id>/<document id>`, so every device that sees the trip
+   — yours, and those of people it is shared with — can open it; a device
+   that does not have it yet fetches it once and keeps it for offline.
+   Share links and backups still carry the reference only. */
 
-export const MAX_FILE_BYTES = 25 * 1024 * 1024
+// 500 kB, as the storage bucket allows (which counts 512,000 bytes).
+export const MAX_FILE_BYTES = 500 * 1000
+export const DOCS_BUCKET = 'triplanner-documents'
 
-// Stores the file and returns the reference a plan keeps. Throws when the
-// file is too big or the browser refuses the write.
+// Photos the app can redraw smaller (a HEIC photo only where the browser
+// can open it — Safari).
+const SHRINKABLE = /^image\/(jpeg|png|webp|heic|heif)$/i
+
+// Bigger than a document may be. `shrinkable` when it is a photo the app
+// can offer to make smaller.
+export class TooBigError extends Error {
+  constructor(file) {
+    super(`it is ${fmtBytes(file.size)} — documents can be up to ${fmtBytes(MAX_FILE_BYTES)}`)
+    this.file = file
+    this.shrinkable = SHRINKABLE.test(file.type)
+  }
+}
+
+// What the storage bucket is told the file is; it accepts PDFs and images.
+function typeOf(file) {
+  if (file.type) return file.type
+  if (/\.pdf$/i.test(file.name)) return 'application/pdf'
+  if (/\.jpe?g$/i.test(file.name)) return 'image/jpeg'
+  if (/\.png$/i.test(file.name)) return 'image/png'
+  return ''
+}
+
+// Stores the file and returns the reference a plan keeps. Throws a
+// TooBigError for a file over the limit, or when the browser refuses it.
 export async function addFile(file) {
-  if (file.size > MAX_FILE_BYTES) throw new Error('files over 25 MB are too big to keep offline')
-  const ref = { id: uid(), name: file.name || 'Document', type: file.type || '', size: file.size }
+  if (file.size > MAX_FILE_BYTES) throw new TooBigError(file)
+  const ref = { id: uid(), name: file.name || 'Document', type: typeOf(file), size: file.size }
   await filePut(ref.id, { blob: file, name: ref.name, type: ref.type, size: ref.size, addedAt: Date.now() })
   return ref
 }
 
-// The stored Blob, or null when this device does not hold it.
-export async function readFile(id) {
-  const record = await fileGet(id)
-  return record?.blob ?? null
+/* A smaller copy of a photo, as a JPEG under the limit: first the same
+   size at a little less quality, then a step smaller each time, until it
+   fits. Throws when the photo cannot be opened (a format this browser does
+   not draw) or will not get small enough. */
+export async function shrinkImage(file, limit = MAX_FILE_BYTES) {
+  const image = await openImage(file)
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('this browser cannot redraw photos')
+  // a ticket or pass stays readable at 2400 pixels on its long side
+  let scale = Math.min(1, 2400 / Math.max(image.width, image.height))
+  for (let round = 0; round < 8; round++) {
+    canvas.width = Math.max(1, Math.round(image.width * scale))
+    canvas.height = Math.max(1, Math.round(image.height * scale))
+    ctx.fillStyle = '#fff' // a transparent PNG gets a white ground, as JPEG has no transparency
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+    for (const quality of [0.85, 0.75, 0.65]) {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality))
+      if (blob && blob.size <= limit) {
+        const name = (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg'
+        return new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() })
+      }
+    }
+    scale *= 0.75
+  }
+  throw new Error('it could not be made small enough')
 }
+
+function openImage(file) {
+  if (typeof createImageBitmap === 'function') {
+    return createImageBitmap(file).catch(() => openWithImg(file))
+  }
+  return openWithImg(file)
+}
+
+function openWithImg(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(img)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('this browser cannot open this kind of photo'))
+    }
+    img.src = url
+  })
+}
+
+/* ---------- the account's copy ---------- */
+
+// Where a trip's documents live in storage: under its owner, as the
+// owner's account knows the trip. Null without a signed-in user.
+export function documentsFolder(trip, userId) {
+  if (!trip) return null
+  if (trip.sharedFrom) return `${trip.sharedFrom.ownerId}/${trip.sharedFrom.tripId}`
+  return userId ? `${userId}/${trip.id}` : null
+}
+
+async function signedInUserId() {
+  if (!supabase) return null
+  const { data } = await supabase.auth.getSession()
+  return data.session?.user?.id ?? null
+}
+
+/* The stored Blob: from this device, else from the account (and then kept
+   here for offline). Null when neither has it — not added yet on the other
+   device, or not signed in. */
+export async function readFile(ref, trip) {
+  const record = await fileGet(ref.id)
+  if (record?.blob) return record.blob
+  const folder = documentsFolder(trip, await signedInUserId())
+  if (!folder) return null
+  const { data: blob, error } = await supabase.storage.from(DOCS_BUCKET).download(`${folder}/${ref.id}`)
+  if (error || !blob) return null
+  await filePut(ref.id, {
+    blob,
+    name: ref.name,
+    type: ref.type,
+    size: ref.size,
+    addedAt: Date.now(),
+    uploaded: [folder],
+  }).catch(() => {})
+  return blob
+}
+
+// The account already holds it: an earlier upload, or another device's.
+const alreadyThere = error => error?.statusCode === '409' || /exists|duplicate/i.test(error?.message ?? '')
+
+let uploading = false
+
+/* Puts every document on this device that a trip uses, and that the
+   account does not have yet, into the account. Runs after each sync; a
+   document over the limit (added before there was one) stays on this
+   device only. Quietly stops at the first failure — offline, or the
+   account is not active — and tries again after the next sync. */
+export async function uploadFiles(trips, userId) {
+  if (!supabase || !userId || uploading) return
+  uploading = true
+  try {
+    for (const trip of trips) {
+      const folder = documentsFolder(trip, userId)
+      if (!folder) continue
+      for (const ref of trip.days.flatMap(d => d.items.flatMap(i => i.attachments ?? []))) {
+        const record = await fileGet(ref.id)
+        if (!record?.blob || record.size > MAX_FILE_BYTES || (record.uploaded ?? []).includes(folder)) continue
+        const { error } = await supabase.storage
+          .from(DOCS_BUCKET)
+          .upload(`${folder}/${ref.id}`, record.blob, { contentType: record.type || ref.type, upsert: false })
+        if (error && !alreadyThere(error)) return
+        await filePut(ref.id, { ...record, uploaded: [...(record.uploaded ?? []), folder] })
+      }
+    }
+  } catch {
+    // offline or storage unavailable — the next sync tries again
+  } finally {
+    uploading = false
+  }
+}
+
+/* ---------- housekeeping ---------- */
 
 export const referencedFiles = trips =>
   new Set(trips.flatMap(t => t.days.flatMap(d => d.items.flatMap(i => (i.attachments ?? []).map(a => a.id)))))
 
-/* Removes documents no plan points to any more. A file is only removed once
-   it is a day old: a form in another tab may hold a fresh one it has not
-   saved yet, and an Undo can bring a deleted plan back. */
+/* Removes documents no plan points to any more from this device. A file is
+   only removed once it is a day old: a form in another tab may hold a fresh
+   one it has not saved yet, and an Undo can bring a deleted plan back. */
 export async function collectUnusedFiles(trips, { minAge = 864e5 } = {}) {
   try {
     const used = referencedFiles(trips)

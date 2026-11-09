@@ -405,7 +405,7 @@ function PinCard({ trip, item, n, floating, onStatus, onEdit, onStep, onClose })
           {item.notes}
         </p>
       )}
-      <DocumentChips docs={item.attachments} className="mt-2" />
+      <DocumentChips docs={item.attachments} trip={trip} className="mt-2" />
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         {open ? (

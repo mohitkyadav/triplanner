@@ -1,18 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
-import { addFile, fmtBytes, readFile } from '../lib/files'
-import { btnChip, btnGhost, IconDownload, IconExternal, IconFile, IconPaperclip, IconX, iconBtn, Modal } from './ui'
+import { addFile, fmtBytes, MAX_FILE_BYTES, readFile, shrinkImage, TooBigError } from '../lib/files'
+import { syncEnabled, useSession } from '../lib/sync'
+import {
+  btnChip,
+  btnChipBrand,
+  btnGhost,
+  IconAlert,
+  IconDownload,
+  IconExternal,
+  IconFile,
+  IconPaperclip,
+  IconX,
+  iconBtn,
+  Modal,
+} from './ui'
 
 /* Documents on a plan: a list to manage them in the plan form, chips to open
-   them from Trip mode, and the viewer both use. Everything is read from this
-   device, so it works with no signal. */
+   them from Trip mode, and the viewer both use. A document opens from this
+   device, or — the first time on another device — from the account, and is
+   kept here for offline after that. `trip` says where the account keeps it. */
 
-export function DocumentViewer({ doc, onClose }) {
-  const [state, setState] = useState({ status: 'loading' }) // loading | missing | { url }
+export function DocumentViewer({ doc, trip, onClose }) {
+  const [state, setState] = useState({ status: 'loading' }) // loading | missing | ready
+  const session = useSession()
 
   useEffect(() => {
     let url = null
     let alive = true
-    readFile(doc.id).then(blob => {
+    readFile(doc, trip).then(blob => {
       if (!alive) return
       if (!blob) return setState({ status: 'missing' })
       url = URL.createObjectURL(blob)
@@ -22,6 +37,8 @@ export function DocumentViewer({ doc, onClose }) {
       alive = false
       if (url) URL.revokeObjectURL(url)
     }
+    // the trip only says where to look; the document is what opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.id])
 
   const isImage = doc.type.startsWith('image/')
@@ -33,8 +50,13 @@ export function DocumentViewer({ doc, onClose }) {
         <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Opening…</p>
       ) : state.status === 'missing' ? (
         <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-          This document is not on this device. Documents stay where they were added — they do not travel in backups or
-          share links.
+          {!syncEnabled
+            ? 'This document is on the device it was added on.'
+            : !session?.user
+              ? 'This document is on another device. Sign in to open documents from your other devices.'
+              : doc.size > MAX_FILE_BYTES
+                ? `This document is ${fmtBytes(doc.size)}, over the ${fmtBytes(MAX_FILE_BYTES)} the account keeps, so it stays on the device it was added on.`
+                : 'This document has not reached the account yet. Open the trip on the device it was added on, while online, and try again.'}
         </p>
       ) : (
         <div className="space-y-3 pb-1">
@@ -67,11 +89,15 @@ export function DocumentViewer({ doc, onClose }) {
   )
 }
 
-// The plan form's list: open, remove, and add documents.
-export function DocumentList({ docs, onChange, onError }) {
+/* The plan form's list: open, remove, and add documents. A file over the
+   limit is not added; a photo among them can be made smaller instead — the
+   same picture, a little lower in quality — and added then. */
+export function DocumentList({ docs, trip, onChange, onError }) {
   const [viewing, setViewing] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [tooBig, setTooBig] = useState([]) // files waiting for "make it smaller"
   const inputRef = useRef(null)
+  const session = useSession()
 
   async function add(e) {
     const files = [...(e.target.files ?? [])]
@@ -79,15 +105,34 @@ export function DocumentList({ docs, onChange, onError }) {
     if (files.length === 0) return
     setBusy(true)
     const added = []
+    const big = []
     for (const file of files) {
       try {
         added.push(await addFile(file))
       } catch (err) {
-        onError?.(`“${file.name}” was not added — ${err.message || 'the device refused to store it'}`)
+        if (err instanceof TooBigError) big.push(file)
+        else onError?.(`“${file.name}” was not added — ${err.message || 'the device refused to store it'}`)
       }
     }
     setBusy(false)
     if (added.length) onChange([...docs, ...added])
+    setTooBig(big)
+  }
+
+  // Makes a photo smaller, then attaches the smaller copy.
+  async function shrink(file) {
+    setBusy(true)
+    try {
+      const smaller = await shrinkImage(file)
+      const ref = await addFile(smaller)
+      onChange([...docs, ref])
+      setTooBig(list => list.filter(f => f !== file))
+      onError?.(`Attached a smaller copy of “${file.name}” (${fmtBytes(ref.size)})`)
+    } catch (err) {
+      onError?.(`“${file.name}” could not be made smaller — ${err.message}`)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -107,7 +152,12 @@ export function DocumentList({ docs, onChange, onError }) {
               >
                 {doc.name}
               </button>
-              <span className="shrink-0 text-xs tabular-nums text-slate-400">{fmtBytes(doc.size)}</span>
+              <span
+                className={`shrink-0 text-xs tabular-nums ${doc.size > MAX_FILE_BYTES ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}
+                title={doc.size > MAX_FILE_BYTES ? 'Over the limit: kept on this device only' : undefined}
+              >
+                {fmtBytes(doc.size)}
+              </span>
               <button
                 type="button"
                 className={`${iconBtn} p-1.5`}
@@ -120,6 +170,42 @@ export function DocumentList({ docs, onChange, onError }) {
           ))}
         </ul>
       )}
+
+      {/* too big to add: why, and for a photo, a way to make it fit */}
+      {tooBig.map(file => {
+        const shrinkable = new TooBigError(file).shrinkable
+        return (
+          <div
+            key={`${file.name}-${file.size}`}
+            role="alert"
+            className="rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900 ring-1 ring-amber-200 dark:bg-amber-400/10 dark:text-amber-100 dark:ring-amber-400/25"
+          >
+            <p className="flex items-start gap-2">
+              <IconAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span className="min-w-0">
+                <span className="font-semibold">
+                  “{file.name}” is {fmtBytes(file.size)}
+                </span>{' '}
+                — documents can be up to {fmtBytes(MAX_FILE_BYTES)}.{' '}
+                {shrinkable
+                  ? 'It can be attached as a smaller, slightly lower-quality copy.'
+                  : 'Try a smaller copy — for example, save just the ticket page as a PDF.'}
+              </span>
+            </p>
+            <div className="mt-2.5 flex flex-wrap gap-2 pl-6">
+              {shrinkable && (
+                <button type="button" className={btnChipBrand} onClick={() => shrink(file)} disabled={busy}>
+                  {busy ? 'Making it smaller…' : 'Make it smaller and attach'}
+                </button>
+              )}
+              <button type="button" className={btnChip} onClick={() => setTooBig(list => list.filter(f => f !== file))}>
+                {shrinkable ? 'Not now' : 'OK'}
+              </button>
+            </div>
+          </div>
+        )
+      })}
+
       <button type="button" className={btnChip} onClick={() => inputRef.current?.click()} disabled={busy}>
         <IconPaperclip className="size-4" />
         {busy ? 'Adding…' : 'Attach ticket, pass or confirmation'}
@@ -134,15 +220,20 @@ export function DocumentList({ docs, onChange, onError }) {
         data-testid="attach-input"
       />
       <p className="text-[13px] text-slate-400 dark:text-slate-500">
-        Kept on this device for offline use — not in backups or share links.
+        Up to {fmtBytes(MAX_FILE_BYTES)} each.{' '}
+        {syncEnabled && session?.user
+          ? 'Kept on this device and in your account, so your other devices — and anyone the trip is shared with — can open them.'
+          : syncEnabled
+            ? 'Kept on this device; sign in to open them on your other devices too.'
+            : 'Kept on this device for offline use.'}
       </p>
-      {viewing && <DocumentViewer doc={viewing} onClose={() => setViewing(null)} />}
+      {viewing && <DocumentViewer doc={viewing} trip={trip} onClose={() => setViewing(null)} />}
     </div>
   )
 }
 
 // One chip per document, for opening on the go.
-export function DocumentChips({ docs, className = '' }) {
+export function DocumentChips({ docs, trip, className = '' }) {
   const [viewing, setViewing] = useState(null)
   if (!docs?.length) return null
   return (
@@ -153,7 +244,7 @@ export function DocumentChips({ docs, className = '' }) {
           <span className="max-w-40 truncate">{doc.name}</span>
         </button>
       ))}
-      {viewing && <DocumentViewer doc={viewing} onClose={() => setViewing(null)} />}
+      {viewing && <DocumentViewer doc={viewing} trip={trip} onClose={() => setViewing(null)} />}
     </div>
   )
 }
