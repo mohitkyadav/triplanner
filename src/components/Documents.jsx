@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { addFile, fmtBytes, MAX_FILE_BYTES, readFile, shrinkImage, TooBigError } from '../lib/files'
+import {
+  ACCEPT_ATTR,
+  addFile,
+  canUpload,
+  fmtBytes,
+  MAX_FILE_BYTES,
+  readFile,
+  shrinkImage,
+  TooBigError,
+} from '../lib/files'
 import { syncEnabled, useSession } from '../lib/sync'
 import {
   btnChip,
@@ -56,7 +65,9 @@ export function DocumentViewer({ doc, trip, onClose }) {
               ? 'This document is on another device. Sign in to open documents from your other devices.'
               : doc.size > MAX_FILE_BYTES
                 ? `This document is ${fmtBytes(doc.size)}, over the ${fmtBytes(MAX_FILE_BYTES)} the account keeps, so it stays on the device it was added on.`
-                : 'This document has not reached the account yet. Open the trip on the device it was added on, while online, and try again.'}
+                : !canUpload(doc)
+                  ? 'The account does not keep this kind of file, so it stays on the device it was added on.'
+                  : 'This document has not reached the account yet. Open the trip on the device it was added on, while online, and try again.'}
         </p>
       ) : (
         <div className="space-y-3 pb-1">
@@ -153,8 +164,14 @@ export function DocumentList({ docs, trip, onChange, onError }) {
                 {doc.name}
               </button>
               <span
-                className={`shrink-0 text-xs tabular-nums ${doc.size > MAX_FILE_BYTES ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}
-                title={doc.size > MAX_FILE_BYTES ? 'Over the limit: kept on this device only' : undefined}
+                className={`shrink-0 text-xs tabular-nums ${canUpload(doc) ? 'text-slate-400' : 'text-amber-600 dark:text-amber-400'}`}
+                title={
+                  canUpload(doc)
+                    ? undefined
+                    : doc.size > MAX_FILE_BYTES
+                      ? 'Over the limit: kept on this device only'
+                      : 'A kind of file the account does not keep: on this device only'
+                }
               >
                 {fmtBytes(doc.size)}
               </span>
@@ -213,7 +230,7 @@ export function DocumentList({ docs, trip, onChange, onError }) {
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,application/pdf"
+        accept={ACCEPT_ATTR}
         multiple
         hidden
         onChange={add}

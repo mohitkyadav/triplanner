@@ -17,6 +17,18 @@ import { uid } from './uid'
 export const MAX_FILE_BYTES = 500 * 1000
 export const DOCS_BUCKET = 'triplanner-documents'
 
+// What a document may be — as the storage bucket accepts (see chapri-apps).
+export const ACCEPTED_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+]
+export const ACCEPT_ATTR = ACCEPTED_TYPES.join(',')
+
 // Photos the app can redraw smaller (a HEIC photo only where the browser
 // can open it — Safari).
 const SHRINKABLE = /^image\/(jpeg|png|webp|heic|heif)$/i
@@ -37,14 +49,25 @@ function typeOf(file) {
   if (/\.pdf$/i.test(file.name)) return 'application/pdf'
   if (/\.jpe?g$/i.test(file.name)) return 'image/jpeg'
   if (/\.png$/i.test(file.name)) return 'image/png'
+  if (/\.webp$/i.test(file.name)) return 'image/webp'
+  if (/\.gif$/i.test(file.name)) return 'image/gif'
+  if (/\.hei[cf]$/i.test(file.name)) return `image/${file.name.slice(-4).toLowerCase()}`
   return ''
 }
+
+// Whether the account can keep it: within the limit, and a kind of file the
+// bucket takes. Documents added before there were rules may be neither, and
+// stay on the device they were added on.
+export const canUpload = ref => ref.size <= MAX_FILE_BYTES && ACCEPTED_TYPES.includes(ref.type)
 
 // Stores the file and returns the reference a plan keeps. Throws a
 // TooBigError for a file over the limit, or when the browser refuses it.
 export async function addFile(file) {
+  const type = typeOf(file)
+  if (!ACCEPTED_TYPES.includes(type))
+    throw new Error('only PDFs and photos (JPEG, PNG, WebP, GIF, HEIC) can be attached')
   if (file.size > MAX_FILE_BYTES) throw new TooBigError(file)
-  const ref = { id: uid(), name: file.name || 'Document', type: typeOf(file), size: file.size }
+  const ref = { id: uid(), name: file.name || 'Document', type, size: file.size }
   await filePut(ref.id, { blob: file, name: ref.name, type: ref.type, size: ref.size, addedAt: Date.now() })
   return ref
 }
@@ -139,7 +162,15 @@ export async function readFile(ref, trip) {
 }
 
 // The account already holds it: an earlier upload, or another device's.
-const alreadyThere = error => error?.statusCode === '409' || /exists|duplicate/i.test(error?.message ?? '')
+const alreadyThere = error =>
+  String(error?.statusCode) === '409' || error?.status === 409 || /exists|duplicate/i.test(error?.message ?? '')
+
+// The bucket turned this one file down (its kind or size); the others may
+// still go. Anything else — offline, signed out, not active — stops the run.
+const refused = error =>
+  ['413', '415'].includes(String(error?.statusCode)) ||
+  [413, 415].includes(error?.status) ||
+  /mime|not supported|too large|maximum allowed size/i.test(error?.message ?? '')
 
 let uploading = false
 
@@ -157,10 +188,17 @@ export async function uploadFiles(trips, userId) {
       if (!folder) continue
       for (const ref of trip.days.flatMap(d => d.items.flatMap(i => i.attachments ?? []))) {
         const record = await fileGet(ref.id)
-        if (!record?.blob || record.size > MAX_FILE_BYTES || (record.uploaded ?? []).includes(folder)) continue
+        if (!record?.blob || record.refused || (record.uploaded ?? []).includes(folder)) continue
+        const type = record.type || ref.type
+        if (!canUpload({ size: record.size ?? record.blob.size, type })) continue
         const { error } = await supabase.storage
           .from(DOCS_BUCKET)
-          .upload(`${folder}/${ref.id}`, record.blob, { contentType: record.type || ref.type, upsert: false })
+          .upload(`${folder}/${ref.id}`, record.blob, { contentType: type, upsert: false })
+        if (error && refused(error)) {
+          // asked once; asking again after every sync would not change the answer
+          await filePut(ref.id, { ...record, refused: true })
+          continue
+        }
         if (error && !alreadyThere(error)) return
         await filePut(ref.id, { ...record, uploaded: [...(record.uploaded ?? []), folder] })
       }
