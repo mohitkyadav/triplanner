@@ -191,9 +191,14 @@ export async function uploadFiles(trips, userId) {
         if (!record?.blob || record.refused || (record.uploaded ?? []).includes(folder)) continue
         const type = record.type || ref.type
         if (!canUpload({ size: record.size ?? record.blob.size, type })) continue
+        // The bytes, not the Blob: a Blob goes up as a form, and Safari sends
+        // a Blob it read back from IndexedDB as a broken one (the bucket
+        // answers 400). Bytes go as the body with the type said outright.
+        const bytes = await record.blob.arrayBuffer()
         const { error } = await supabase.storage
           .from(DOCS_BUCKET)
-          .upload(`${folder}/${ref.id}`, record.blob, { contentType: type, upsert: false })
+          .upload(`${folder}/${ref.id}`, bytes, { contentType: type, upsert: false })
+        if (error && !alreadyThere(error)) console.warn('[triplanner] document not uploaded:', ref.name, error.message)
         if (error && refused(error)) {
           // asked once; asking again after every sync would not change the answer
           await filePut(ref.id, { ...record, refused: true })

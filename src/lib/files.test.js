@@ -5,8 +5,18 @@ vi.mock('./supabase', () => ({
   supabase: { storage: { from: () => ({ upload: (...args) => upload(...args) }) } },
 }))
 
+// The documents store, kept in memory: the fake IndexedDB of the tests does
+// not keep a Blob as a Blob.
+const files = new Map()
+vi.mock('./idb', () => ({
+  fileGet: async id => files.get(id),
+  filePut: async (id, record) => void files.set(id, record),
+  fileDelete: async id => void files.delete(id),
+  fileEntries: async () => [...files].map(([id, r]) => ({ id, ...r })),
+}))
+
 const { uploadFiles } = await import('./files')
-const { fileDelete, fileEntries, fileGet, filePut } = await import('./idb')
+const { fileGet, filePut } = await import('./idb')
 
 const doc = (id, type, size) => ({ id, name: id, type, size })
 const trip = docs => ({ id: 'trip-1', days: [{ id: 'd1', items: [{ id: 'i1', attachments: docs }] }] })
@@ -18,7 +28,7 @@ async function store(ref) {
 describe('uploading documents to the account', () => {
   beforeEach(async () => {
     upload.mockReset()
-    for (const e of await fileEntries()) await fileDelete(e.id)
+    files.clear()
   })
 
   it('skips documents the bucket will not take and carries on with the rest', async () => {
@@ -38,6 +48,8 @@ describe('uploading documents to the account', () => {
     await uploadFiles([trip(docs)], 'user-1')
 
     expect(upload.mock.calls.map(c => c[0])).toEqual(['user-1/trip-1/odd.png', 'user-1/trip-1/ticket.pdf'])
+    expect(upload.mock.calls[1][1]).toBeInstanceOf(ArrayBuffer)
+    expect(upload.mock.calls[1][1].byteLength).toBe(120_000)
     expect(upload.mock.calls[1][2]).toEqual({ contentType: 'application/pdf', upsert: false })
     expect((await fileGet('ticket.pdf')).uploaded).toEqual(['user-1/trip-1'])
     expect((await fileGet('odd.png')).refused).toBe(true)
